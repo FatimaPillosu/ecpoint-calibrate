@@ -244,7 +244,4 @@ dist
 ecPoint_Calibrate_GMD_Paper_Structure.docx
 
 # Large test data files
-tests/sample_output/PDT_48r1.ascii
-tests/sample_output/PDT_48r1.parquet
-tests/sample_output/BP.csv
-tests/sample_output/WTs/
+tests/sample_output/

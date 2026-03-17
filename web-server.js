@@ -268,10 +268,12 @@ app.get('/api/serve-file', (req, res) => {
 })
 
 // --- Start server ---
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n  ecPoint-Calibrate Web UI`)
   console.log(`  =======================`)
   console.log(`  Frontend:  http://localhost:${PORT}`)
   console.log(`  Backend:   ${FLASK_BACKEND}`)
   console.log(`\n  Open http://localhost:${PORT} in your browser.\n`)
 })
+
+module.exports = server

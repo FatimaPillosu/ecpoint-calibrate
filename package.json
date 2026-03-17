@@ -5,14 +5,41 @@
   "engines": {
     "node": ">=14.5.0"
   },
-  "main": "web-server.js",
+  "main": "electron.js",
   "scripts": {
     "preinstall": "rm -rvf node_modules/*/.git",
     "start": "node web-server.js",
+    "start:electron": "electron .",
     "build": "webpack --progress",
     "dev": "webpack --watch",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "dist:mac": "electron-builder --mac",
+    "dist": "electron-builder --win --linux",
     "lint": "prettier --config ./.prettierrc --write 'ui/**/*.js' web-server.js",
     "test": "jest"
+  },
+  "build": {
+    "appId": "int.ecmwf.ecpoint-calibrate",
+    "productName": "ecPoint-Calibrate",
+    "files": [
+      "electron.js",
+      "web-server.js",
+      "index.html",
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable",
+      "signAndEditExecutable": false
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "mac": {
+      "target": "dmg"
+    }
   },
   "jest": {
     "moduleFileExtensions": [
@@ -34,8 +61,8 @@
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
-    "http-proxy-middleware": "^2.0.6",
     "glob": "^8.1.0",
+    "http-proxy-middleware": "^2.0.6",
     "rc-slider": "^9.7.2"
   },
   "devDependencies": {
@@ -65,6 +92,8 @@
     "babel-loader": "^8.0.6",
     "copy-webpack-plugin": "4.5.1",
     "css-loader": "0.28.11",
+    "electron": "^41.0.2",
+    "electron-builder": "^26.8.1",
     "file-loader": "1.1.10",
     "jest": "^26.6.3",
     "lodash": "^4.17.20",
