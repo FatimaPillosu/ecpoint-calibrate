@@ -322,10 +322,13 @@ class Split extends Component {
                 <Input
                   disabled={this.state.auto}
                   error={this.numberArrayHasError(this.state.customSplitValues)}
-                  value={this.state.customSplitValues}
+                  value={this.state.customSplitValues.join('/')}
                   onChange={e =>
                     this.setState({
-                      customSplitValues: e.target.value.split(',').map(v => v.trim()),
+                      customSplitValues: e.target.value
+                        .split('/')
+                        .map(v => v.trim())
+                        .filter(v => v !== ''),
                     })
                   }
                   label={
@@ -340,7 +343,7 @@ class Split extends Component {
                     />
                   }
                   labelPosition="right"
-                  placeholder="Enter BP value"
+                  placeholder="e.g. 0.25/0.5/0.75"
                 />
               </Grid.Column>
               <Grid.Column width={3}>{this.getSplitButton()}</Grid.Column>
