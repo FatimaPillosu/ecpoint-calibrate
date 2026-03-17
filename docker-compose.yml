@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.core
+    ports:
+      - "8888:8888"
+    volumes:
+      - /home:/home
+      - /tmp:/tmp
+      - /var/tmp:/var/tmp
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "3000:3000"
+    environment:
+      - FLASK_BACKEND=http://backend:8888
+      - PORT=3000
+    volumes:
+      - /home:/home
+      - /tmp:/tmp
+      - /var/tmp:/var/tmp
+    depends_on:
+      - backend
+    restart: unless-stopped

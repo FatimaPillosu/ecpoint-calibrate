@@ -1,0 +1,94 @@
+{
+  "name": "ecpoint-calibrate",
+  "version": "1.0.1",
+  "description": "Web GUI for ecPoint-Calibrate powered by Express and React",
+  "engines": {
+    "node": ">=14.5.0"
+  },
+  "main": "web-server.js",
+  "scripts": {
+    "preinstall": "rm -rvf node_modules/*/.git",
+    "start": "node web-server.js",
+    "build": "webpack --progress",
+    "dev": "webpack --watch",
+    "lint": "prettier --config ./.prettierrc --write 'ui/**/*.js' web-server.js",
+    "test": "jest"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "jsx"
+    ],
+    "moduleDirectories": [
+      "node_modules"
+    ],
+    "moduleNameMapper": {
+      "^~/(.*)$": "<rootDir>/ui/$1"
+    }
+  },
+  "author": "Anirudha Bose <anirudha.bose@alumni.cern>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/esowc/ecPoint-Calibrate.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6",
+    "glob": "^8.1.0",
+    "rc-slider": "^9.7.2"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.5.5",
+    "@babel/core": "^7.5.5",
+    "@babel/plugin-proposal-class-properties": "^7.5.5",
+    "@babel/plugin-proposal-decorators": "^7.4.4",
+    "@babel/plugin-proposal-do-expressions": "^7.5.0",
+    "@babel/plugin-proposal-export-default-from": "^7.5.2",
+    "@babel/plugin-proposal-export-namespace-from": "^7.5.2",
+    "@babel/plugin-proposal-function-bind": "^7.2.0",
+    "@babel/plugin-proposal-function-sent": "^7.5.0",
+    "@babel/plugin-proposal-json-strings": "^7.2.0",
+    "@babel/plugin-proposal-logical-assignment-operators": "^7.2.0",
+    "@babel/plugin-proposal-nullish-coalescing-operator": "^7.4.4",
+    "@babel/plugin-proposal-numeric-separator": "^7.2.0",
+    "@babel/plugin-proposal-object-rest-spread": "^7.5.5",
+    "@babel/plugin-proposal-optional-chaining": "^7.2.0",
+    "@babel/plugin-proposal-pipeline-operator": "^7.5.0",
+    "@babel/plugin-proposal-throw-expressions": "^7.2.0",
+    "@babel/plugin-syntax-dynamic-import": "^7.2.0",
+    "@babel/plugin-syntax-import-meta": "^7.2.0",
+    "@babel/polyfill": "^7.4.4",
+    "@babel/preset-env": "^7.5.5",
+    "@babel/preset-react": "^7.0.0",
+    "axios": "^0.21.1",
+    "babel-loader": "^8.0.6",
+    "copy-webpack-plugin": "4.5.1",
+    "css-loader": "0.28.11",
+    "file-loader": "1.1.10",
+    "jest": "^26.6.3",
+    "lodash": "^4.17.20",
+    "prettier": "1.18.2",
+    "react": "^16.13.1",
+    "react-d3-tree": "^2.0.1",
+    "react-datasheet": "^1.4.8",
+    "react-datepicker": "^3.3.0",
+    "react-dom": "^16.13.1",
+    "react-iframe": "^1.8.0",
+    "react-redux": "^7.2.1",
+    "react-router-dom": "^5.2.0",
+    "react-sortable-hoc": "^1.11.0",
+    "react-toastify": "^6.0.9",
+    "redux": "^4.0.5",
+    "redux-persist": "^6.0.0",
+    "redux-thunk": "^2.3.0",
+    "save-svg-as-png": "^1.4.17",
+    "semantic-ui-css": "^2.3.2",
+    "semantic-ui-react": "0.81.3",
+    "semver": "^7.3.2",
+    "style-loader": "0.21.0",
+    "url-loader": "1.0.0",
+    "webpack": "^4.39.2",
+    "webpack-cli": "^3.3.6"
+  }
+}

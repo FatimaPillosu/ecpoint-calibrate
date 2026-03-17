@@ -1,0 +1,110 @@
+html, body, .background {
+  width: 100%;
+  height: 94%;
+  margin: 0 !important;
+  padding: 0;
+  font-family: 'Lato', sans-serif;
+}
+
+html {
+  background: #fff;
+}
+
+body {
+  background: #eee;
+}
+
+.background {
+  height: inherit;
+  background-image: url("../img/background.jpg");
+  background-position: center; /* Center the image */
+  background-repeat: no-repeat; /* Do not repeat the image */
+  background-size: cover; /* Resize the background image to cover the entire container */
+}
+
+.card > .header {
+  color: #fff;
+  background-color: #24252a;
+  font-size: 24px;
+  font-weight: 300;
+  height: 70px;
+  padding: 24px;
+}
+
+.log {
+  color: #edede3;
+  font-family: "RobotoMono",Monaco,"Courier New",monospace;
+  font-size: 13px;
+  height: 4px;
+}
+
+.data-grid-container .data-grid {
+  table-layout: fixed;
+  border-collapse: collapse;
+  width: 100%;
+  margin: auto;
+}
+
+.data-grid-container .data-grid .cell > input {
+  outline: none !important;
+  border: 1.5px solid rgb(33, 133, 208) !important;
+  text-align:right;
+  width: calc(100%) !important;
+  height: 100% !important;
+  background: none;
+  display: block;
+}
+
+code {
+  font-family: Courier, 'New Courier', monospace;
+  font-size: 11.5px !important;
+  margin: 1em .25em !important;
+  background-color: #f7f7f9;
+  color: #e01e5a;
+  padding: 2px 3px 1px;
+  border: 1px solid #e1e1e8;
+}
+
+#root {
+  height: inherit;
+  width: inherit;
+}
+
+.cta-left {
+  padding-left: 0 !important;
+  padding-right: 50px !important;
+}
+
+.cta-right {
+  padding-left: 50px !important;
+  padding-right: 0!important;
+}
+
+.splash-footer {
+  bottom: 0;
+  left: 0;
+  position: absolute !important;
+  padding: 20px;
+}
+
+.right-splash-grid {
+  padding-right: 180px !important;
+  padding-left: 100px !important;
+}
+
+table.data-grid {
+  table-layout: auto !important;
+}
+
+.data-grid .cell {
+  padding: 0 10px !important;
+}
+
+/*
+ * Trick to make sure the fullscreen modal has equal and correct spacing
+ * on both sides of the modal.
+ */
+.ui.fullscreen.scrolling.modal {
+  left: 0 !important;
+  right: 0 !important;
+}

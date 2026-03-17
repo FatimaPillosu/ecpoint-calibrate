@@ -1,0 +1,15 @@
+FROM node:18-slim
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --legacy-peer-deps
+
+COPY dist/ dist/
+COPY web-server.js index.html ./
+
+EXPOSE 3000
+
+ENV FLASK_BACKEND=http://backend:8888
+
+CMD ["node", "web-server.js"]

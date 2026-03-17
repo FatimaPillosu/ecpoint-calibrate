@@ -1,0 +1,38 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+ipython = "*"
+pudb = "*"
+pytest = "*"
+pytest-cov = "*"
+codecov = "*"
+black = "==19.3b0"
+isort = "*"
+
+[packages]
+attrs = "*"
+flask = "*"
+pandas = "*"
+matplotlib = "*"
+metview = "*"
+healthcheck = "*"
+netcdf4 = "*"
+scipy = "*"
+colour = "*"
+python-dateutil = "*"
+pyarrow = "*"
+flask-cors = "*"
+ecmwflibs = "*"
+cfgrib = "*"
+xarray = "*"
+
+[requires]
+python_version = "3.8"
+
+[scripts]
+lint = "bash -c 'isort -rc core tests && black tests core'"
+test = "py.test"
+server = "python -m core.api"
