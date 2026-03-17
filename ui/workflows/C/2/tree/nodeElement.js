@@ -1,6 +1,6 @@
 import React from 'react'
 
-const PureSvgNodeElement = ({ nodeDatum, toggleNode, onNodeClick }) => {
+const PureSvgNodeElement = ({ nodeDatum, toggleNode, onNodeClick, onNodeRightClick }) => {
   const isLeaf = nodeDatum.children.length === 0 && !nodeDatum.meta._collapsed
   const isCollapsed = nodeDatum.meta._collapsed
 
@@ -19,11 +19,21 @@ const PureSvgNodeElement = ({ nodeDatum, toggleNode, onNodeClick }) => {
       }
     : {}
 
+  const handleContextMenu = (e) => {
+    if (isCollapsed) return // collapsed nodes just expand on click, no menu
+    e.preventDefault()
+    e.stopPropagation()
+    const nodeType = isLeaf ? 'leaf' : 'node'
+    onNodeRightClick(nodeDatum, toggleNode, nodeType, e)
+  }
+
   return (
     <>
       <circle
         r={15}
         onClick={() => onNodeClick(nodeDatum, toggleNode)}
+        onContextMenu={handleContextMenu}
+        style={{ cursor: 'pointer' }}
         {...svgShapeProps}
       ></circle>
       {isCollapsed && (
@@ -39,7 +49,12 @@ const PureSvgNodeElement = ({ nodeDatum, toggleNode, onNodeClick }) => {
         </text>
       )}
       <g className="rd3t-label">
-        <text onClick={() => onNodeClick(nodeDatum, toggleNode)} strokeWidth="0.7">
+        <text
+          onClick={() => onNodeClick(nodeDatum, toggleNode)}
+          onContextMenu={handleContextMenu}
+          strokeWidth="0.7"
+          style={{ cursor: 'pointer' }}
+        >
           <tspan x="20" fontSize="smaller">
             {nodeDatum.name}
           </tspan>

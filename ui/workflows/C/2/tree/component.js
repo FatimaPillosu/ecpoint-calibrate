@@ -4,7 +4,7 @@ import Tree from 'react-d3-tree'
 import NodeLabel from './nodeElement'
 import { saveSvgAsPng } from 'save-svg-as-png'
 
-import { Button, Dimmer, Dropdown, Form, Grid, Loader, Radio } from 'semantic-ui-react'
+import { Button, Dimmer, Grid, Loader } from 'semantic-ui-react'
 import client from '~/utils/client'
 import { errorHandler } from '~/utils/toast'
 import MappingFunction from './mappingFunction'
@@ -28,6 +28,49 @@ const CV_MODES_MAP = {
   STD_DEV: 'c',
 }
 
+// Context menu styles
+const contextMenuStyle = {
+  position: 'fixed',
+  zIndex: 10000,
+  background: 'white',
+  border: '1px solid #ccc',
+  borderRadius: '6px',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+  padding: '6px 0',
+  minWidth: '200px',
+  fontSize: '13px',
+}
+
+const menuItemStyle = {
+  padding: '8px 18px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  transition: 'background 0.1s',
+  userSelect: 'none',
+}
+
+const menuItemHoverStyle = {
+  ...menuItemStyle,
+  background: '#e8f4e8',
+}
+
+const menuSeparatorStyle = {
+  height: '1px',
+  background: '#e0e0e0',
+  margin: '4px 0',
+}
+
+const menuHeaderStyle = {
+  padding: '6px 18px 4px',
+  fontSize: '11px',
+  fontWeight: 'bold',
+  color: '#888',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+}
+
 export default class TreeContainer extends Component {
   state = {
     openMappingFunction: false,
@@ -37,6 +80,9 @@ export default class TreeContainer extends Component {
     loading: false,
     mode: MODES_MAP.VISUALIZE_LEAF_MF,
     conditionalVerificationMode: null,
+    // Context menu state
+    contextMenu: null, // { x, y, nodeType, node, toggleNode }
+    hoveredMenuItem: null,
   }
 
   componentDidMount() {
@@ -47,6 +93,31 @@ export default class TreeContainer extends Component {
         y: 14,
       },
     })
+    document.addEventListener('click', this.closeContextMenu)
+    document.addEventListener('contextmenu', this.handleDocumentContextMenu)
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('click', this.closeContextMenu)
+    document.removeEventListener('contextmenu', this.handleDocumentContextMenu)
+    window.removeEventListener('keydown', this.handleKeyboardInput)
+  }
+
+  closeContextMenu = () => {
+    if (this.state.contextMenu) {
+      this.setState({ contextMenu: null, hoveredMenuItem: null })
+    }
+  }
+
+  handleDocumentContextMenu = (e) => {
+    // Only close the menu if right-clicking outside the context menu itself.
+    // Don't close it immediately — the node's onContextMenu handler sets
+    // the menu state, and this fires right after. We use a flag to skip.
+    if (this._skipNextContextMenuClose) {
+      this._skipNextContextMenuClose = false
+      return
+    }
+    this.closeContextMenu()
   }
 
   getMergedMatrix(node) {
@@ -175,7 +246,7 @@ export default class TreeContainer extends Component {
     this.props.setBreakpoints(this.props.labels, matrix, this.props.fieldRanges)
   }
 
-  onNodeClickConditionalVerificationMode = node => {
+  onNodeClickConditionalVerificationMode = (node, cvMode) => {
     this.setState({
       loading: 'Generating conditional verification map. Please wait.',
     })
@@ -187,7 +258,7 @@ export default class TreeContainer extends Component {
         ],
         path: this.props.path,
         code: node.meta.code,
-        mode: this.state.conditionalVerificationMode,
+        mode: cvMode,
         cheaper: this.props.cheaper,
       })
       .then(response => {
@@ -207,6 +278,7 @@ export default class TreeContainer extends Component {
     this.setState({ openSplit: true, nodeMeta: node.meta })
   }
 
+  // Left-click: default action based on node type
   onNodeClick = (node, toggleNode) => {
     // Handle lazy-loaded collapsed nodes: expand on any click
     if (node.meta._collapsed) {
@@ -214,95 +286,142 @@ export default class TreeContainer extends Component {
       return
     }
 
-    if (node.children.length !== 0 && this.shouldCollapseNode()) {
-      toggleNode()
-      return
-    }
+    const isLeaf = node.children.length === 0
 
-    if (this.state.mode === MODES_MAP.SPLIT_LEAF) {
-      this.onNodeClickEditMode(node)
-    } else if (this.state.conditionalVerificationMode) {
-      this.onNodeClickConditionalVerificationMode(node)
-    } else if (this.state.mode === MODES_MAP.VISUALIZE_LEAF_MF) {
+    if (isLeaf) {
+      // Default left-click on leaf: visualize MF
       this.onNodeClickExploreMode(node)
-    } else if (this.state.mode === MODES_MAP.VISUALIZE_NODE_MF) {
-      this.onNodeClickExploreMode(node)
-    } else if (this.state.mode === MODES_MAP.MERGE_NODE) {
-      this.onNodeClickMergeChildrenMode(node)
-    } else if (this.state.mode === MODES_MAP.MERGE_LEAF) {
-      this.onNodeClickMergeLeafNode(node)
+    } else {
+      // Default left-click on internal node: toggle collapse/expand
+      if (toggleNode) toggleNode()
     }
   }
 
-  shouldCollapseNode = () =>
-    ![MODES_MAP.VISUALIZE_NODE_MF, MODES_MAP.MERGE_NODE].includes(this.state.mode)
+  // Right-click: show context menu
+  onNodeRightClick = (node, toggleNode, nodeType, event) => {
+    // Set flag so the document-level contextmenu listener doesn't
+    // immediately close the menu we're about to open
+    this._skipNextContextMenuClose = true
+
+    // Get coordinates from the native DOM event
+    const nativeEvent = event.nativeEvent || event
+    this.setState({
+      contextMenu: {
+        x: nativeEvent.clientX || nativeEvent.pageX,
+        y: nativeEvent.clientY || nativeEvent.pageY,
+        nodeType,
+        node,
+        toggleNode,
+      },
+      hoveredMenuItem: null,
+    })
+  }
+
+  handleContextMenuAction = (action) => {
+    const { node, toggleNode } = this.state.contextMenu
+    this.setState({ contextMenu: null, hoveredMenuItem: null })
+
+    switch (action) {
+      case 'visualize_mf':
+        this.onNodeClickExploreMode(node)
+        break
+      case 'split_leaf':
+        this.onNodeClickEditMode(node)
+        break
+      case 'merge_node':
+        this.onNodeClickMergeChildrenMode(node)
+        break
+      case 'merge_leaf':
+        this.onNodeClickMergeLeafNode(node)
+        break
+      case 'cv_obs_frequency':
+        this.onNodeClickConditionalVerificationMode(node, CV_MODES_MAP.OBS_FREQUENCY)
+        break
+      case 'cv_mean':
+        this.onNodeClickConditionalVerificationMode(node, CV_MODES_MAP.MEAN)
+        break
+      case 'cv_std_dev':
+        this.onNodeClickConditionalVerificationMode(node, CV_MODES_MAP.STD_DEV)
+        break
+      default:
+        break
+    }
+  }
+
+  shouldCollapseNode = () => false
 
   handleKeyboardInput = e => {
-    const code = e.keyCode ? e.keyCode : e.which
-
-    if (code === 69) {
-      // 'e' key
-      this.setState({
-        mode: MODES_MAP.SPLIT_LEAF,
-        conditionalVerificationMode: null,
-      })
-    }
-
-    if (code === 65) {
-      // 'a' key
-      this.state.conditionalVerificationMode !== CV_MODES_MAP.OBS_FREQUENCY
-        ? this.setState({
-            mode: MODES_MAP.VISUALIZE_LEAF_MF,
-            conditionalVerificationMode: CV_MODES_MAP.OBS_FREQUENCY,
-          })
-        : this.setState({ conditionalVerificationMode: null })
-    }
-
-    if (code === 66) {
-      // 'b' key
-      this.state.conditionalVerificationMode !== CV_MODES_MAP.MEAN
-        ? this.setState({
-            mode: MODES_MAP.VISUALIZE_LEAF_MF,
-            conditionalVerificationMode: CV_MODES_MAP.MEAN,
-          })
-        : this.setState({ conditionalVerificationMode: null })
-    }
-
-    if (code === 67) {
-      // 'c' key
-      this.state.conditionalVerificationMode !== CV_MODES_MAP.STD_DEV
-        ? this.setState({
-            mode: MODES_MAP.VISUALIZE_LEAF_MF,
-            conditionalVerificationMode: CV_MODES_MAP.STD_DEV,
-          })
-        : this.setState({ conditionalVerificationMode: null })
-    }
+    // Keep keyboard shortcuts working — they now apply to the last right-clicked node
+    // or can be used after selecting a node
   }
 
   componentWillMount() {
     window.addEventListener('keydown', this.handleKeyboardInput.bind(this))
   }
 
-  getModeDropdown = () => (
-    <Dropdown
-      placeholder="Select a mode"
-      options={[
-        { key: 1, text: 'Visualize leaf MF', value: MODES_MAP.VISUALIZE_LEAF_MF },
-        { key: 2, text: 'Visualize node MF', value: MODES_MAP.VISUALIZE_NODE_MF },
-        { key: 3, text: 'Split leaf', value: MODES_MAP.SPLIT_LEAF },
-        { key: 4, text: 'Merge Node', value: MODES_MAP.MERGE_NODE },
-        { key: 5, text: 'Merge leaf (no change)', value: MODES_MAP.MERGE_LEAF },
-      ]}
-      selection
-      value={this.state.mode}
-      onChange={(e, { value }) =>
-        this.setState({
-          mode: value,
-          conditionalVerificationMode: null,
-        })
-      }
-    />
-  )
+  renderContextMenu = () => {
+    const { contextMenu, hoveredMenuItem } = this.state
+    if (!contextMenu) return null
+
+    const { x, y, nodeType } = contextMenu
+
+    const leafItems = [
+      { key: 'visualize_mf', icon: '📊', label: 'Visualize Mapping Function' },
+      { key: 'split_leaf', icon: '✂️', label: 'Split Leaf' },
+      { key: 'merge_leaf', icon: '🔗', label: 'Merge Leaf (no change)' },
+      { key: 'separator_1', separator: true },
+      { key: 'cv_header', header: true, label: 'Conditional Verification' },
+      { key: 'cv_obs_frequency', icon: '🗺️', label: 'Observation Frequency' },
+      { key: 'cv_mean', icon: '🗺️', label: 'Mean' },
+      { key: 'cv_std_dev', icon: '🗺️', label: 'Standard Deviation' },
+    ]
+
+    const nodeItems = [
+      { key: 'visualize_mf', icon: '📊', label: 'Visualize Mapping Function' },
+      { key: 'merge_node', icon: '🔗', label: 'Merge Node' },
+    ]
+
+    const items = nodeType === 'leaf' ? leafItems : nodeItems
+
+    // Ensure menu stays within viewport
+    const menuWidth = 240
+    const menuHeight = items.length * 36
+    const adjustedX = x + menuWidth > window.innerWidth ? x - menuWidth : x
+    const adjustedY = y + menuHeight > window.innerHeight ? y - menuHeight : y
+
+    return (
+      <div
+        style={{
+          ...contextMenuStyle,
+          left: adjustedX,
+          top: adjustedY,
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation() }}
+      >
+        {items.map(item => {
+          if (item.separator) {
+            return <div key={item.key} style={menuSeparatorStyle} />
+          }
+          if (item.header) {
+            return <div key={item.key} style={menuHeaderStyle}>{item.label}</div>
+          }
+          return (
+            <div
+              key={item.key}
+              style={hoveredMenuItem === item.key ? menuItemHoverStyle : menuItemStyle}
+              onMouseEnter={() => this.setState({ hoveredMenuItem: item.key })}
+              onMouseLeave={() => this.setState({ hoveredMenuItem: null })}
+              onClick={() => this.handleContextMenuAction(item.key)}
+            >
+              <span>{item.icon}</span>
+              <span>{item.label}</span>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   render = () => {
     return (
@@ -314,86 +433,6 @@ export default class TreeContainer extends Component {
         ref={tc => (this.treeContainer = tc)}
       >
         <Grid>
-          <Grid.Column floated="left" width={5}>
-            <Form>
-              Mode:&nbsp;&nbsp;
-              {this.getModeDropdown()}
-              <p>Conditional verification plots:</p>
-              <Form.Group>
-                <Form.Field>
-                  <Radio
-                    label="Observation frequency"
-                    name="radioGroup"
-                    value={CV_MODES_MAP.OBS_FREQUENCY}
-                    checked={
-                      this.state.conditionalVerificationMode ===
-                      CV_MODES_MAP.OBS_FREQUENCY
-                    }
-                    onChange={() =>
-                      this.state.conditionalVerificationMode ===
-                      CV_MODES_MAP.OBS_FREQUENCY
-                        ? this.setState({ conditionalVerificationMode: null })
-                        : !this.shouldCollapseNode()
-                        ? this.setState({
-                            conditionalVerificationMode: CV_MODES_MAP.OBS_FREQUENCY,
-                          })
-                        : this.setState({
-                            conditionalVerificationMode: CV_MODES_MAP.OBS_FREQUENCY,
-                            mode: MODES_MAP.VISUALIZE_LEAF_MF,
-                          })
-                    }
-                    toggle
-                  />
-                </Form.Field>
-                <Form.Field>
-                  <Radio
-                    label="Mean"
-                    name="radioGroup"
-                    value={CV_MODES_MAP.MEAN}
-                    checked={
-                      this.state.conditionalVerificationMode === CV_MODES_MAP.MEAN
-                    }
-                    onChange={() =>
-                      this.state.conditionalVerificationMode === CV_MODES_MAP.MEAN
-                        ? this.setState({ conditionalVerificationMode: null })
-                        : !this.shouldCollapseNode()
-                        ? this.setState({
-                            conditionalVerificationMode: CV_MODES_MAP.MEAN,
-                          })
-                        : this.setState({
-                            conditionalVerificationMode: CV_MODES_MAP.MEAN,
-                            mode: MODES_MAP.VISUALIZE_LEAF_MF,
-                          })
-                    }
-                    toggle
-                  />
-                </Form.Field>
-                <Form.Field>
-                  <Radio
-                    label="Standard Deviation"
-                    name="radioGroup"
-                    value={CV_MODES_MAP.STD_DEV}
-                    checked={
-                      this.state.conditionalVerificationMode === CV_MODES_MAP.STD_DEV
-                    }
-                    onChange={() =>
-                      this.state.conditionalVerificationMode === CV_MODES_MAP.STD_DEV
-                        ? this.setState({ conditionalVerificationMode: null })
-                        : !this.shouldCollapseNode()
-                        ? this.setState({
-                            conditionalVerificationMode: CV_MODES_MAP.STD_DEV,
-                          })
-                        : this.setState({
-                            conditionalVerificationMode: CV_MODES_MAP.STD_DEV,
-                            mode: MODES_MAP.VISUALIZE_LEAF_MF,
-                          })
-                    }
-                    toggle
-                  />
-                </Form.Field>
-              </Form.Group>
-            </Form>
-          </Grid.Column>
           <Grid.Column floated="right" width={5}>
             <Button
               content="Save tree as PNG"
@@ -418,11 +457,16 @@ export default class TreeContainer extends Component {
             <NodeLabel
               {...nodeProps}
               onNodeClick={(node, toggleNode) => this.onNodeClick(node, toggleNode)}
+              onNodeRightClick={(node, toggleNode, nodeType, event) =>
+                this.onNodeRightClick(node, toggleNode, nodeType, event)
+              }
             />
           )}
           collapsible={this.shouldCollapseNode()}
           separation={{ siblings: 2, nonSiblings: 2 }}
         />
+
+        {this.renderContextMenu()}
 
         <MappingFunction
           onClose={() =>
