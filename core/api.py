@@ -1,6 +1,21 @@
 import json
 import os
 import traceback
+
+# Load .env file if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # python-dotenv not installed — read .env manually
+    _env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    if os.path.isfile(_env_path):
+        with open(_env_path) as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip())
 from datetime import datetime
 from functools import lru_cache
 from io import StringIO
@@ -601,6 +616,162 @@ def get_obs_frequency():
     cv_map = wt.plot_maps(df, code, mode.lower())
 
     return jsonify(cv_map)
+
+
+################################################################################
+# AI-assisted plot modification endpoints
+################################################################################
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+_SYSTEM_PROMPT = """\
+You are an expert Python developer specialising in geospatial data visualisation
+with earthkit.maps (built on top of matplotlib and cartopy).
+
+The user will give you the CURRENT Python plotting code together with a
+natural-language instruction describing how to change the plot.
+Return ONLY the modified Python code — no explanation, no markdown fences,
+no comments about what you changed.
+
+The code must:
+- be a complete, self-contained function called `custom_plot(lons, lats, values, code)`
+  that returns a dict `{"image": <base64_png_string>}`.
+- import everything it needs at the top of the function body.
+- encode the result as a base64 PNG string (not PDF).
+- never call plt.show().
+- Keep the signature exactly: `def custom_plot(lons, lats, values, code):`
+
+IMPORTANT — earthkit.maps API reference:
+- `chart = ekm.Chart()` — create chart. Constructor accepts: domain, domain_crs, crs
+- `chart.scatter(values, x=lons, y=lats, style=style, s=2)` — scatter plot. Data is first arg, coords via x= y=.
+- `chart.coastlines(linewidth=0.8, color="sienna")` — add coastlines
+- `chart.borders(linewidth=0.4, color="sienna")` — add country borders
+- `chart.land()`, `chart.ocean()`, `chart.lakes()`, `chart.rivers()` — natural features
+- `chart.gridlines()` — add lat/lon grid
+- `chart.title("text")` — set title
+- `chart.save(path_or_buf, format="png", dpi=150)` — save to file or BytesIO
+- `chart.fig` — access the underlying matplotlib Figure
+- `chart.fig.get_axes()[0]` — access the underlying cartopy GeoAxes
+- `ekm.Style(colors=[...], levels=[...], legend_style="colorbar")` — define binned style
+- `ekm.Chart(domain="Europe")` — zoom to a named domain. Available: "global", "Europe",
+  "North America", "South America", "Africa", "Asia", "Oceania", "Arctic", "Antarctic"
+- `ekm.Chart(crs=ccrs.Mollweide())` — use Mollweide projection (default in this app).
+  Other projections: ccrs.PlateCarree(), ccrs.Robinson(), ccrs.Orthographic(), etc.
+  Always `import cartopy.crs as ccrs` when changing projections.
+
+To zoom to a custom area, access the underlying cartopy axes:
+  `ax = chart.fig.get_axes()[0]`
+  `ax.set_extent([lon_min, lon_max, lat_min, lat_max])`
+
+Do NOT use `chart.set_extent()` — that method does not exist.
+Do NOT use `chart.domain(...)` as a method call — domain is a constructor parameter only.
+"""
+
+
+@app.route("/postprocessing/ai-modify-plot", methods=("POST",))
+def ai_modify_plot():
+    """Call Gemini to modify the current Earth-Kit / matplotlib code."""
+    try:
+        import requests as http_requests
+
+        payload = request.get_json()
+        current_code = payload["code"]
+        user_instruction = payload["instruction"]
+
+        prompt = (
+            f"CURRENT CODE:\n```python\n{current_code}\n```\n\n"
+            f"USER INSTRUCTION: {user_instruction}\n\n"
+            "Return the modified code following the system rules."
+        )
+
+        gemini_url = (
+            f"https://generativelanguage.googleapis.com/v1beta/"
+            f"models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+        )
+
+        gemini_payload = {
+            "contents": [{
+                "parts": [{"text": _SYSTEM_PROMPT + "\n\n" + prompt}]
+            }]
+        }
+
+        resp = http_requests.post(gemini_url, json=gemini_payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+
+        modified_code = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+        # Strip markdown fences if Gemini adds them despite instructions
+        if modified_code.startswith("```"):
+            lines = modified_code.split("\n")
+            lines = [l for l in lines if not l.startswith("```")]
+            modified_code = "\n".join(lines)
+
+        return jsonify({"code": modified_code})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/postprocessing/run-custom-plot", methods=("POST",))
+def run_custom_plot():
+    """Execute user-supplied plotting code and return the base64 PNG."""
+    try:
+        import base64
+        import numpy as np
+
+        payload = request.get_json()
+        code_text = payload["code"]
+        labels = payload["labels"]
+        thrWT = payload["thrWT"]
+        path = sanitize_path(payload["path"])
+        wt_code = payload["wtCode"]
+        mode = payload["mode"]
+        cheaper = payload["cheaper"]
+
+        # Load and prepare the data (same as plot-cv-map)
+        loader = load_point_data_by_path(path, cheaper=cheaper)
+        thrWT_floats = [float(cell) for cell in thrWT]
+        series = pandas.Series(dict(zip(labels, thrWT_floats)))
+        thrL, thrH = series.iloc[::2], series.iloc[1::2]
+
+        wt = WeatherType(
+            thrL=thrL, thrH=thrH, thrL_labels=labels[::2], thrH_labels=labels[1::2]
+        )
+        df, _ = wt.evaluate(
+            loader.error_type.name, "LonOBS", "LatOBS", "OBS", loader=loader
+        )
+
+        # Prepare the data arrays based on mode
+        if mode.lower() == "a":
+            grouped = df[["LonOBS", "LatOBS", "OBS"]].groupby(
+                ["LatOBS", "LonOBS"], as_index=False
+            ).count()
+            lons = grouped["LonOBS"].to_numpy(dtype=np.float64)
+            lats = grouped["LatOBS"].to_numpy(dtype=np.float64)
+            values = grouped["OBS"].to_numpy(dtype=np.float64)
+        else:
+            error = "FER" if "FER" in df.columns else "FE"
+            grouped = df[["LonOBS", "LatOBS", error]].groupby(["LatOBS", "LonOBS"])
+            if mode.lower() == "b":
+                grouped = grouped[error].mean().reset_index()
+            else:
+                grouped = grouped[error].std().reset_index()
+            lons = grouped["LonOBS"].to_numpy(dtype=np.float64)
+            lats = grouped["LatOBS"].to_numpy(dtype=np.float64)
+            values = grouped[error].to_numpy(dtype=np.float64)
+
+        # Execute the user code in a restricted namespace
+        exec_globals = {}
+        exec(code_text, exec_globals)
+        result = exec_globals["custom_plot"](lons, lats, values, wt_code)
+
+        return jsonify(result)
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 @lru_cache(maxsize=None)
