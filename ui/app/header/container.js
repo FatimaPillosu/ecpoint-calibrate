@@ -2,6 +2,7 @@ import { connect } from 'react-redux'
 
 import Header from './component'
 import { onSaveOperationClicked } from './actions'
+import { setWorkflow } from '../actions'
 import { setPath as warmupPredictorMetadataCache } from '../../workflows/B/1/predictors/actions'
 
 const mapStateToProps = state => ({
@@ -12,6 +13,7 @@ const mapStateToProps = state => ({
 
 const mapDispatchToProps = dispatch => ({
   onSaveOperationClicked: mode => dispatch(onSaveOperationClicked(mode)),
+  setWorkflow: workflow => dispatch(setWorkflow(workflow)),
   resetApp: () => dispatch({ type: 'RESET_APP' }),
   loadWorkflow: data => {
     dispatch({ type: 'LOAD_WORKFLOW', data })

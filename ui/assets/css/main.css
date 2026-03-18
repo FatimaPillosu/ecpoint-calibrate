@@ -1,9 +1,12 @@
-html, body, .background {
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Work+Sans:wght@300;400;500&display=swap');
+
+html, body {
   width: 100%;
   height: 94%;
   margin: 0 !important;
   padding: 0;
-  font-family: 'Lato', sans-serif;
+  font-family: 'Work Sans', 'Lato', sans-serif !important;
+  font-weight: 300 !important;
 }
 
 html {
@@ -14,12 +17,446 @@ body {
   background: #eee;
 }
 
+/* ==============================
+   HOMEPAGE / SPLASH SCREEN
+   ============================== */
+
+.homepage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: calc(100vh - 52px);
+  background-color: #faf8f5;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+}
+
+/* Globe background decoration */
+.homepage-globe-bg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200%;
+  height: 200%;
+  opacity: 0.20;
+  pointer-events: none;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.homepage-globe-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Two-column layout */
+.homepage-left {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.homepage-right {
+  position: relative;
+  z-index: 2;
+  width: 560px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+  .homepage {
+    flex-direction: column;
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+  .homepage-right {
+    width: 100%;
+  }
+}
+
+/* Main content area (left side) */
+.homepage-content {
+  max-width: 620px;
+  padding: 40px;
+  margin-left: 8%;
+}
+
+@media (max-width: 900px) {
+  .homepage-content {
+    margin-left: 5%;
+  }
+}
+
+/* Brand block: ECPOINT / CALIBRATE stacked */
+.homepage-brand {
+  margin-bottom: 32px;
+}
+
+.homepage-brand-name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.homepage-brand-ecpoint {
+  font-family: 'Poppins', sans-serif;
+  font-size: 52px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: #1a1a2e;
+}
+
+.homepage-brand-calibrate {
+  font-family: 'Poppins', sans-serif;
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: 10.2px;
+  color: #0d9488;
+}
+
+.homepage-brand-version {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 300;
+  letter-spacing: 1px;
+  color: #333333;
+  margin-top: 6px;
+  display: inline-block;
+}
+
+/* Main heading */
+.homepage-heading {
+  font-family: 'Poppins', sans-serif;
+  font-size: 25px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #333333;
+  margin: 0 0 24px 0;
+  letter-spacing: -0.5px;
+}
+
+.homepage-heading-accent {
+  color: #0d9488;
+  font-weight: 500;
+}
+
+@media (max-width: 600px) {
+  .homepage-heading {
+    font-size: 36px;
+  }
+}
+
+/* Description paragraph */
+.homepage-description {
+  font-family: 'Work Sans', sans-serif !important;
+  font-weight: 300 !important;
+  font-size: 16px;
+  line-height: 1.7;
+  color: #333333;
+  margin: 0 0 32px 0;
+  max-width: 480px;
+}
+
+/* CTA buttons row */
+.homepage-cta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+
+.homepage-cta-dropdown {
+  position: relative;
+  z-index: 200;
+}
+
+/* Primary button (teal) */
+.homepage-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d9488;
+  color: #fff;
+  border: none;
+  padding: 14px 32px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  letter-spacing: 0.3px;
+}
+
+.homepage-btn-primary:hover {
+  background: #0f766e;
+  transform: translateY(-1px);
+}
+
+.homepage-btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Secondary button (outlined) */
+.homepage-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #374151;
+  border: 1.5px solid #d1d5db;
+  padding: 13px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, transform 0.1s;
+  letter-spacing: 0.3px;
+}
+
+.homepage-btn-secondary:hover {
+  border-color: #9ca3af;
+  color: #111827;
+  transform: translateY(-1px);
+}
+
+.homepage-btn-secondary:active {
+  transform: translateY(0);
+}
+
+/* Disabled secondary button */
+.homepage-btn-disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+}
+
+.homepage-btn-disabled:hover {
+  transform: none;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+/* "coming soon" badge */
+.homepage-coming-soon {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.08);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
+/* Dropdown menu under "Get Started" */
+.homepage-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  padding: 8px;
+  z-index: 200;
+  min-width: 360px;
+  animation: homepage-dropdown-in 0.15s ease-out;
+}
+
+@keyframes homepage-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.homepage-dropdown-item {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+  text-align: left;
+}
+
+.homepage-dropdown-item:hover {
+  background: #f0fdfa;
+}
+
+.homepage-dropdown-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 3px;
+}
+
+.homepage-dropdown-desc {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* Overlay to close dropdown when clicking outside */
+.homepage-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+}
+
+/* Footer */
+.homepage-footer {
+  position: absolute;
+  bottom: 20px;
+  left: 40px;
+  font-size: 12px;
+  color: #333333;
+  letter-spacing: 0.5px;
+  text-align: left;
+  line-height: 1.6;
+}
+
+.homepage-footer-license {
+  text-transform: none;
+  font-size: 13px;
+  color: #666666;
+  letter-spacing: 0.2px;
+  margin-top: 6px;
+}
+
+/* ==============================
+   WORKFLOW PANEL (right side)
+   ============================== */
+
+.workflow-panel {
+  background: rgba(13, 148, 136, 0.04);
+  border-left: 1px solid rgba(13, 148, 136, 0.1);
+  padding: 48px 36px;
+  width: 100%;
+  overflow-y: auto;
+}
+
+.workflow-header-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #0d9488;
+  margin-bottom: 16px;
+}
+
+.workflow-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1a1a2e;
+  margin: 0 0 36px 0;
+}
+
+.workflow-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.workflow-step {
+  position: relative;
+}
+
+.workflow-step-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.workflow-step-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0d9488;
+  letter-spacing: 0.5px;
+}
+
+.workflow-step-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1.5px solid rgba(13, 148, 136, 0.3);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.workflow-step-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 6px 0;
+}
+
+.workflow-step-desc {
+  font-family: 'Work Sans', sans-serif !important;
+  font-weight: 300 !important;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #333333;
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .workflow-panel {
+    border-left: none;
+    border-top: 1px solid rgba(13, 148, 136, 0.1);
+    padding: 36px;
+  }
+
+  .workflow-steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .workflow-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==============================
+   LEGACY / APP STYLES
+   ============================== */
+
 .background {
   height: inherit;
   background-image: url("../img/background.jpg");
-  background-position: center; /* Center the image */
-  background-repeat: no-repeat; /* Do not repeat the image */
-  background-size: cover; /* Resize the background image to cover the entire container */
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .card > .header {
