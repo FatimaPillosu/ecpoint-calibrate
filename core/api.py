@@ -697,63 +697,66 @@ def eliminate_small_wts():
             groups[key] = []
         groups[key].append(i)
 
-    to_eliminate = set()
+    # For each sibling group, find at most ONE WT to eliminate per round.
+    # Scan ALL WTs from right to left:
+    #   - If a non-leftmost WT is below threshold, merge it into its LEFT neighbor.
+    #   - If only the leftmost is below threshold, merge it into its RIGHT neighbor.
+    # One merge per group per round.
+    to_eliminate = {}  # idx -> 'left' or 'right' (direction to merge INTO)
     for key, members in groups.items():
         if len(members) < 2:
-            continue  # can't merge if only one member in group
-        if len(members) == 2:
-            # Special case: exactly 2 siblings — if EITHER is below threshold, merge right into left
-            if counts[members[0]] < threshold or counts[members[1]] < threshold:
-                to_eliminate.add(members[-1])  # always merge rightmost
-        else:
-            # Normal case: only check the rightmost member
-            rightmost_idx = members[-1]
-            if counts[rightmost_idx] < threshold:
-                to_eliminate.add(rightmost_idx)
-
-    # Process right-to-left: merge each eliminated row into its left neighbor
-    sorted_elim = sorted(to_eliminate, reverse=True)
-    pred_label_list = [l.replace("_thrL", "") for l in labels[::2]]
-
-    for idx in sorted_elim:
-        if idx == 0:
-            # Leftmost row: merge into right neighbor
-            if len(matrix) > 1:
-                right = matrix[1]
-                left = matrix[0]
-                for p in range(num_predictors - 1, -1, -1):
-                    lL, hL = left[p * 2], left[p * 2 + 1]
-                    lR, hR = right[p * 2], right[p * 2 + 1]
-                    if lL != lR or hL != hR:
-                        right[p * 2] = min(lL, lR) if lL != float('-inf') and lR != float('-inf') else float('-inf')
-                        right[p * 2 + 1] = max(hL, hR) if hL != float('inf') and hR != float('inf') else float('inf')
-                        pred_name = pred_label_list[p]
-                        if pred_name in ranges:
-                            field_min, field_max = float(ranges[pred_name][0]), float(ranges[pred_name][1])
-                            if right[p * 2] <= field_min and right[p * 2 + 1] >= field_max:
-                                right[p * 2] = float('-inf')
-                                right[p * 2 + 1] = float('inf')
-                        break
-                matrix.pop(0)
             continue
 
-        # Normal case: merge into left neighbor
-        left = matrix[idx - 1]
-        right = matrix[idx]
+        # Scan from right to left, checking ALL members
+        found = False
+        for i in range(len(members) - 1, 0, -1):  # rightmost down to index 1 (skip leftmost)
+            idx = members[i]
+            if counts[idx] < threshold:
+                to_eliminate[idx] = 'left'  # merge into left neighbor
+                found = True
+                break  # one per group per round
+
+        if not found:
+            # No non-leftmost WT was below threshold.
+            # Check the leftmost WT.
+            leftmost_idx = members[0]
+            if counts[leftmost_idx] < threshold:
+                to_eliminate[leftmost_idx] = 'right'  # merge into right neighbor
+
+    # Process eliminations: merge each eliminated row in the specified direction.
+    # Process right-to-left by index so pop() doesn't invalidate earlier indices.
+    sorted_elim = sorted(to_eliminate.keys(), reverse=True)
+    pred_label_list = [l.replace("_thrL", "") for l in labels[::2]]
+
+    def merge_range(survivor, donor):
+        """Expand survivor's range to cover donor's range at the deepest differing predictor."""
         for p in range(num_predictors - 1, -1, -1):
-            lL, hL = left[p * 2], left[p * 2 + 1]
-            lR, hR = right[p * 2], right[p * 2 + 1]
-            if lL != lR or hL != hR:
-                left[p * 2] = min(lL, lR) if lL != float('-inf') and lR != float('-inf') else float('-inf')
-                left[p * 2 + 1] = max(hL, hR) if hL != float('inf') and hR != float('inf') else float('inf')
+            lS, hS = survivor[p * 2], survivor[p * 2 + 1]
+            lD, hD = donor[p * 2], donor[p * 2 + 1]
+            if lS != lD or hS != hD:
+                survivor[p * 2] = min(lS, lD) if lS != float('-inf') and lD != float('-inf') else float('-inf')
+                survivor[p * 2 + 1] = max(hS, hD) if hS != float('inf') and hD != float('inf') else float('inf')
                 pred_name = pred_label_list[p]
                 if pred_name in ranges:
-                    field_min, field_max = float(ranges[pred_name][0]), float(ranges[pred_name][1])
-                    if left[p * 2] <= field_min and left[p * 2 + 1] >= field_max:
-                        left[p * 2] = float('-inf')
-                        left[p * 2 + 1] = float('inf')
+                    field_min = float(ranges[pred_name][0])
+                    field_max = float(ranges[pred_name][1])
+                    if survivor[p * 2] <= field_min and survivor[p * 2 + 1] >= field_max:
+                        survivor[p * 2] = float('-inf')
+                        survivor[p * 2 + 1] = float('inf')
                 break
-        matrix.pop(idx)
+
+    for idx in sorted_elim:
+        direction = to_eliminate[idx]
+        if direction == 'right':
+            # Leftmost WT: merge into right neighbor
+            if idx + 1 < len(matrix):
+                merge_range(matrix[idx + 1], matrix[idx])
+                matrix.pop(idx)
+        else:
+            # Normal case: merge into left neighbor
+            if idx - 1 >= 0:
+                merge_range(matrix[idx - 1], matrix[idx])
+                matrix.pop(idx)
 
     # Deduplicate identical rows
     seen = []
