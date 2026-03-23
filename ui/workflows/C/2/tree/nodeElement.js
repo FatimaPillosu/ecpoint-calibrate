@@ -62,6 +62,12 @@ const PureSvgNodeElement = ({ nodeDatum, toggleNode, onNodeClick, onNodeRightCli
             {nodeDatum.meta.code && 'WT ' + nodeDatum.meta.code}
             {isCollapsed && ` (${nodeDatum.meta._childCount} leaves)`}
           </tspan>
+          {/* Show unbounded predictor ranges on leaves */}
+          {isLeaf && nodeDatum.meta.unbounded && nodeDatum.meta.unbounded.map((range, i) => (
+            <tspan key={i} x="20" dy="1.4em" fontSize="10" fill="#999">
+              {range}
+            </tspan>
+          ))}
         </text>
       </g>
     </>

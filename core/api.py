@@ -22,6 +22,7 @@ from io import StringIO
 from pathlib import Path
 from textwrap import dedent
 
+import numpy
 import pandas
 from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
@@ -185,13 +186,8 @@ def get_decision_tree():
 
     dt = DecisionTree(threshold_low=thrL, threshold_high=thrH, ranges=ranges)
 
-    # Use lazy tree for large trees (>1000 WTs)
-    num_wt = len(thrL)
-    if num_wt > 1000:
-        max_depth = payload.get("maxDepth", 3)
-        return jsonify([dt.tree_lazy(max_depth=max_depth).json])
-    else:
-        return jsonify([dt.tree.json])
+    # Always build the full tree so all leaves are visible
+    return jsonify([dt.tree.json])
 
 
 @app.route("/postprocessing/expand-tree-node", methods=("POST",))
@@ -586,6 +582,207 @@ def get_breakpoints_suggestions():
         ),
         mimetype="application/json",
     )
+
+
+@app.route("/postprocessing/count-obs-per-wt", methods=("POST",))
+def count_obs_per_wt():
+    """Count the number of observations in each weather type."""
+    payload = request.get_json()
+    labels, matrix, ranges, path, cheaper = (
+        payload["labels"],
+        payload["matrix"],
+        payload["fieldRanges"],
+        sanitize_path(payload["path"]),
+        payload.get("cheaper", False),
+    )
+
+    matrix = [[float(cell) for cell in row] for row in matrix]
+    num_predictors = len(matrix[0]) // 2
+    pred_labels = [l.replace("_thrL", "") for l in labels[::2]]
+
+    loader = load_point_data_by_path(path, cheaper=cheaper)
+    if loader.cheaper:
+        pdt = loader.select(*pred_labels, series=False)
+    else:
+        pdt = loader.dataframe
+
+    # Count per WT using direct threshold checking (safe after merges)
+    counts = []
+    for row in matrix:
+        mask = numpy.ones(len(pdt), dtype=bool)
+        for p in range(num_predictors):
+            lo = row[p * 2]
+            hi = row[p * 2 + 1]
+            col = pdt[pred_labels[p]].to_numpy(dtype=numpy.float64)
+            if lo != float('-inf'):
+                mask &= (col >= lo)
+            if hi != float('inf'):
+                mask &= (col < hi)
+        counts.append(int(mask.sum()))
+
+    return jsonify({"counts": counts})
+
+
+@app.route("/postprocessing/eliminate-small-wts", methods=("POST",))
+def eliminate_small_wts():
+    """
+    Eliminate WTs with fewer than `threshold` observations by merging
+    them right-to-left into their left neighbor.
+
+    Rules:
+    1. Process from right to left so ranges cascade correctly.
+    2. When two leaves merge, the surviving leaf's range expands to cover both
+       (i.e. thrL = min(both thrL), thrH = max(both thrH)).
+    3. If merging makes a predictor's range equal to its full field range,
+       set it to -inf/inf.
+    """
+    payload = request.get_json()
+    labels, matrix, ranges, path, cheaper, threshold = (
+        payload["labels"],
+        payload["matrix"],
+        payload["fieldRanges"],
+        sanitize_path(payload["path"]),
+        payload.get("cheaper", False),
+        int(payload["threshold"]),
+    )
+
+    matrix = [[float(cell) for cell in row] for row in matrix]
+    num_cols = len(matrix[0])
+    num_predictors = num_cols // 2
+
+    # Count obs per WT using direct threshold checking (safe after merges)
+    loader = load_point_data_by_path(path, cheaper=cheaper)
+    pred_labels = [l.replace("_thrL", "") for l in labels[::2]]
+
+    if loader.cheaper:
+        pdt = loader.select(*pred_labels, series=False)
+    else:
+        pdt = loader.dataframe
+
+    counts = []
+    for row in matrix:
+        mask = numpy.ones(len(pdt), dtype=bool)
+        for p in range(num_predictors):
+            lo = row[p * 2]
+            hi = row[p * 2 + 1]
+            col = pdt[pred_labels[p]].to_numpy(dtype=numpy.float64)
+            if lo != float('-inf'):
+                mask &= (col >= lo)
+            if hi != float('inf'):
+                mask &= (col < hi)
+        counts.append(int(mask.sum()))
+
+
+    # Group rows into sibling groups: rows that share the same values
+    # for all predictors except the deepest differing one.
+    # A "sibling group" = rows with identical prefix up to the last split.
+    def get_group_key(row):
+        """Return the predictor values ABOVE the deepest bounded predictor."""
+        # Find the deepest predictor that is not -inf/inf
+        deepest = -1
+        for p in range(num_predictors):
+            lo, hi = row[p * 2], row[p * 2 + 1]
+            if lo != float('-inf') or hi != float('inf'):
+                deepest = p
+        # Group key = all predictor values above the deepest one
+        if deepest <= 0:
+            return ()
+        return tuple(row[: deepest * 2])
+
+    # Find the rightmost small WT in each sibling group
+    groups = {}
+    for i in range(len(matrix)):
+        key = get_group_key(matrix[i])
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(i)
+
+    to_eliminate = set()
+    for key, members in groups.items():
+        if len(members) < 2:
+            continue  # can't merge if only one member in group
+        if len(members) == 2:
+            # Special case: exactly 2 siblings — if EITHER is below threshold, merge right into left
+            if counts[members[0]] < threshold or counts[members[1]] < threshold:
+                to_eliminate.add(members[-1])  # always merge rightmost
+        else:
+            # Normal case: only check the rightmost member
+            rightmost_idx = members[-1]
+            if counts[rightmost_idx] < threshold:
+                to_eliminate.add(rightmost_idx)
+
+    # Process right-to-left: merge each eliminated row into its left neighbor
+    sorted_elim = sorted(to_eliminate, reverse=True)
+    pred_label_list = [l.replace("_thrL", "") for l in labels[::2]]
+
+    for idx in sorted_elim:
+        if idx == 0:
+            # Leftmost row: merge into right neighbor
+            if len(matrix) > 1:
+                right = matrix[1]
+                left = matrix[0]
+                for p in range(num_predictors - 1, -1, -1):
+                    lL, hL = left[p * 2], left[p * 2 + 1]
+                    lR, hR = right[p * 2], right[p * 2 + 1]
+                    if lL != lR or hL != hR:
+                        right[p * 2] = min(lL, lR) if lL != float('-inf') and lR != float('-inf') else float('-inf')
+                        right[p * 2 + 1] = max(hL, hR) if hL != float('inf') and hR != float('inf') else float('inf')
+                        pred_name = pred_label_list[p]
+                        if pred_name in ranges:
+                            field_min, field_max = float(ranges[pred_name][0]), float(ranges[pred_name][1])
+                            if right[p * 2] <= field_min and right[p * 2 + 1] >= field_max:
+                                right[p * 2] = float('-inf')
+                                right[p * 2 + 1] = float('inf')
+                        break
+                matrix.pop(0)
+            continue
+
+        # Normal case: merge into left neighbor
+        left = matrix[idx - 1]
+        right = matrix[idx]
+        for p in range(num_predictors - 1, -1, -1):
+            lL, hL = left[p * 2], left[p * 2 + 1]
+            lR, hR = right[p * 2], right[p * 2 + 1]
+            if lL != lR or hL != hR:
+                left[p * 2] = min(lL, lR) if lL != float('-inf') and lR != float('-inf') else float('-inf')
+                left[p * 2 + 1] = max(hL, hR) if hL != float('inf') and hR != float('inf') else float('inf')
+                pred_name = pred_label_list[p]
+                if pred_name in ranges:
+                    field_min, field_max = float(ranges[pred_name][0]), float(ranges[pred_name][1])
+                    if left[p * 2] <= field_min and left[p * 2 + 1] >= field_max:
+                        left[p * 2] = float('-inf')
+                        left[p * 2 + 1] = float('inf')
+                break
+        matrix.pop(idx)
+
+    # Deduplicate identical rows
+    seen = []
+    for row in matrix:
+        if row not in seen:
+            seen.append(row)
+    matrix = seen
+
+    # Convert back to string format for frontend
+    result_matrix = []
+    for row in matrix:
+        str_row = []
+        for val in row:
+            if val == float('-inf'):
+                str_row.append('-inf')
+            elif val == float('inf'):
+                str_row.append('inf')
+            elif val == int(val):
+                str_row.append(str(int(val)))
+            else:
+                str_row.append(str(val))
+        result_matrix.append(str_row)
+
+    eliminated_count = len(payload["matrix"]) - len(result_matrix)
+    return jsonify({
+        "matrix": result_matrix,
+        "eliminated": eliminated_count,
+        "remaining": len(result_matrix),
+    })
 
 
 @app.route("/postprocessing/plot-cv-map", methods=("POST",))

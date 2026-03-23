@@ -1,3 +1,5 @@
+import _ from 'lodash'
+
 export const isMergeableToPreviousRow = (row, matrix) => {
   if (row === 0) {
     return false

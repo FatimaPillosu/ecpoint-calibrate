@@ -168,6 +168,19 @@ class DecisionTree(object):
                 curr.nodeSvgShape = {
                     "shapeProps": {"stroke": self.leaf_colors[curr.meta["level"]]}
                 }
+                # Add unbounded predictor ranges as metadata for display
+                unbounded = []
+                for level, (low, predictor, high) in enumerate(
+                    zip(thrL, self.predictors, thrH)
+                ):
+                    text = "{low} < {predictor} < {high}".format(
+                        low=int_or_float(low), predictor=predictor, high=int_or_float(high)
+                    )
+                    node_check = Node(text, range=self.ranges[predictor])
+                    if node_check.is_unbounded and not node_check.is_root:
+                        unbounded.append(text)
+                if unbounded:
+                    curr.meta["unbounded"] = unbounded
 
         def codegen(node: Node, code: str):
             node.meta["code"] = code

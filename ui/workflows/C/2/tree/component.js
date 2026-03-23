@@ -238,6 +238,9 @@ export default class TreeContainer extends Component {
     pdfZoom: 100,
     // Tree zoom
     treeZoom: 1,
+    // WT count and elimination
+    minObsThreshold: '',
+    eliminatingWTs: false,
   }
 
   componentDidMount() {
@@ -250,6 +253,62 @@ export default class TreeContainer extends Component {
     })
     document.addEventListener('click', this.closeContextMenu)
     document.addEventListener('contextmenu', this.handleDocumentContextMenu)
+  }
+
+  countLeaves = (node) => {
+    if (!node) return 0
+    if (!node.children || node.children.length === 0) return 1
+    return node.children.reduce((sum, child) => sum + this.countLeaves(child), 0)
+  }
+
+  eliminateSmallWTs = () => {
+    const threshold = parseInt(this.state.minObsThreshold, 10)
+    if (isNaN(threshold) || threshold <= 0) {
+      alert('Please enter a valid positive number.')
+      return
+    }
+
+    this.setState({ eliminatingWTs: true })
+
+    const matrix = this.props.breakpoints.map(row => _.flatMap(row.slice(1)))
+
+    client
+      .post('/postprocessing/eliminate-small-wts', {
+        labels: this.props.labels,
+        matrix,
+        fieldRanges: this.props.fieldRanges,
+        path: this.props.path,
+        cheaper: this.props.cheaper,
+        threshold,
+      })
+      .then(response => {
+        const { matrix: newMatrix, eliminated, remaining } = response.data
+
+        if (eliminated === 0) {
+          alert('No WTs have fewer than ' + threshold + ' observations.')
+          this.setState({ eliminatingWTs: false })
+          return
+        }
+
+        // Save view state
+        const savedTranslate = { ...this.state.translate }
+        const savedZoom = this.state.treeZoom
+
+        this.props.setBreakpoints(this.props.labels, newMatrix, this.props.fieldRanges)
+
+        setTimeout(() => {
+          this.setState({
+            eliminatingWTs: false,
+            translate: savedTranslate,
+            treeZoom: savedZoom,
+          })
+          alert(`Merged ${eliminated} WTs (< ${threshold} obs) into neighbors. ${remaining} WTs remaining.`)
+        }, 200)
+      })
+      .catch(err => {
+        this.setState({ eliminatingWTs: false })
+        errorHandler(err)
+      })
   }
 
   centerRoot = () => {
@@ -442,6 +501,11 @@ export default class TreeContainer extends Component {
 
     const [matrix, from] = this.getMergedMatrix(node)
 
+    console.log('=== Histogram request ===')
+    console.log('WT code:', code, 'idxWT:', node.meta.idxWT, 'from:', from)
+    console.log('thrWT:', JSON.stringify(matrix[from]))
+    console.log('breakpoints row:', JSON.stringify(this.props.breakpoints[from]))
+
     client
       .post('/postprocessing/generate-wt-histogram', {
         labels: this.props.labels,
@@ -628,32 +692,68 @@ export default class TreeContainer extends Component {
   }
 
   onNodeClickMergeChildrenMode = node => {
-    const [matrix, from] = this.getMergedMatrix(node)
-    this.props.setBreakpoints(
-      this.props.labels,
-      _.uniqWith(matrix, _.isEqual),
-      this.props.fieldRanges
-    )
+    try {
+      console.log('Merge node:', JSON.stringify({ children: node.children?.length, meta: node.meta }))
+      const [matrix, from] = this.getMergedMatrix(node)
+      console.log('Merged matrix rows:', matrix.length, 'from:', from)
+
+      // Save current view state before rebuild
+      const savedTranslate = { ...this.state.translate }
+      const savedZoom = this.state.treeZoom
+
+      this.props.setBreakpoints(
+        this.props.labels,
+        _.uniqWith(matrix, _.isEqual),
+        this.props.fieldRanges
+      )
+
+      // Restore view state after rebuild
+      setTimeout(() => {
+        this.setState({ translate: savedTranslate, treeZoom: savedZoom })
+      }, 100)
+    } catch (e) {
+      console.error('Merge node error:', e)
+      alert('Merge failed: ' + e.message)
+    }
   }
 
   onNodeClickMergeLeafNode = node => {
-    let [matrix, from] = this.getMergedMatrix(node)
+    try {
+      // For leaf merge, always use the leaf's own idxWT (not subtree traversal)
+      const leafIdx = node.meta.idxWT
+      console.log('Merge leaf idx:', leafIdx, 'meta:', JSON.stringify(node.meta))
 
-    if (
-      !isMergeableToPreviousRow(
-        from,
-        this.props.breakpoints.map(row => _.flatMap(row.slice(1)))
-      )
-    ) {
-      alert('First node in the group. Merge only to the left.')
-      return
+      const originalMatrix = this.props.breakpoints.map(row => _.flatMap(row.slice(1)))
+
+      console.log('=== Merge Leaf ===')
+      console.log('leafIdx:', leafIdx)
+      console.log('Row being merged (right):', JSON.stringify(originalMatrix[leafIdx]))
+      console.log('Target row (left):', JSON.stringify(originalMatrix[leafIdx - 1]))
+
+      if (!isMergeableToPreviousRow(leafIdx, originalMatrix)) {
+        alert('First node in the group. Merge only to the left.')
+        return
+      }
+
+      const matrix = mergeToPreviousRow(leafIdx, originalMatrix)
+
+      console.log('Merged result row (left):', JSON.stringify(matrix[leafIdx - 1]))
+      console.log('Total rows before:', originalMatrix.length, 'after:', matrix.length)
+
+      // Save current view state before rebuild
+      const savedTranslate = { ...this.state.translate }
+      const savedZoom = this.state.treeZoom
+
+      this.props.setBreakpoints(this.props.labels, matrix, this.props.fieldRanges)
+
+      // Restore view state after rebuild
+      setTimeout(() => {
+        this.setState({ translate: savedTranslate, treeZoom: savedZoom })
+      }, 100)
+    } catch (e) {
+      console.error('Merge leaf error:', e)
+      alert('Merge failed: ' + e.message)
     }
-
-    matrix = mergeToPreviousRow(
-      from,
-      this.props.breakpoints.map(row => _.flatMap(row.slice(1)))
-    )
-    this.props.setBreakpoints(this.props.labels, matrix, this.props.fieldRanges)
   }
 
   onNodeClickEditMode = node => {
@@ -1097,6 +1197,54 @@ export default class TreeContainer extends Component {
               <Icon name="columns" />
               Compare
             </Button>
+
+            {/* WT Count */}
+            <div style={{
+              background: '#0d9488',
+              color: '#fff',
+              padding: '4px 12px',
+              borderRadius: '12px',
+              fontSize: '12px',
+              fontFamily: "'Poppins', sans-serif",
+              fontWeight: 600,
+              letterSpacing: '0.3px',
+            }}>
+              {this.props.breakpoints ? this.props.breakpoints.length : 0} WTs
+            </div>
+
+            {/* Eliminate small WTs */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#666', whiteSpace: 'nowrap' }}>Eliminate WTs with &lt;</span>
+              <input
+                type="number"
+                min="1"
+                value={this.state.minObsThreshold}
+                onChange={e => this.setState({ minObsThreshold: e.target.value })}
+                placeholder="500"
+                style={{
+                  width: '70px',
+                  padding: '4px 6px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontFamily: "'Work Sans', sans-serif",
+                }}
+              />
+              <span style={{ fontSize: '12px', color: '#666', whiteSpace: 'nowrap' }}>obs</span>
+              <Button
+                size="tiny"
+                icon
+                labelPosition="left"
+                color="red"
+                onClick={this.eliminateSmallWTs}
+                loading={this.state.eliminatingWTs}
+                disabled={this.state.eliminatingWTs || !this.state.minObsThreshold}
+                title="Remove all weather types with fewer observations than the threshold"
+              >
+                <Icon name="trash" />
+                Eliminate
+              </Button>
+            </div>
           </div>
           <Button
             content="Save tree as PNG"
