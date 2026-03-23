@@ -623,19 +623,23 @@ def count_obs_per_wt():
     return jsonify({"counts": counts})
 
 
+_pdt_cache = {}  # path -> (dataframe, timestamp)
+
+
 @app.route("/postprocessing/eliminate-small-wts", methods=("POST",))
 def eliminate_small_wts():
     """
-    Eliminate WTs with fewer than `threshold` observations by merging
-    them right-to-left into their left neighbor.
+    Eliminate ALL WTs with fewer than `threshold` observations in one request.
+    Loops internally with correct merge logic until no more WTs are below threshold.
 
-    Rules:
-    1. Process from right to left so ranges cascade correctly.
-    2. When two leaves merge, the surviving leaf's range expands to cover both
-       (i.e. thrL = min(both thrL), thrH = max(both thrH)).
-    3. If merging makes a predictor's range equal to its full field range,
-       set it to -inf/inf.
+    Optimizations:
+    - PDT cached in memory after first load
+    - Vectorized numpy counting (all WTs in one pass)
+    - Multi-round: loops until stable, single tree rebuild at the end
     """
+    import time
+    t0 = time.time()
+
     payload = request.get_json()
     labels, matrix, ranges, path, cheaper, threshold = (
         payload["labels"],
@@ -649,84 +653,93 @@ def eliminate_small_wts():
     matrix = [[float(cell) for cell in row] for row in matrix]
     num_cols = len(matrix[0])
     num_predictors = num_cols // 2
-
-    # Count obs per WT using direct threshold checking (safe after merges)
-    loader = load_point_data_by_path(path, cheaper=cheaper)
     pred_labels = [l.replace("_thrL", "") for l in labels[::2]]
+    initial_count = len(matrix)
 
-    if loader.cheaper:
-        pdt = loader.select(*pred_labels, series=False)
+    # --- Optimization 3: Cache the PDT ---
+    cache_key = (path, cheaper, tuple(pred_labels))
+    if cache_key in _pdt_cache:
+        cols = _pdt_cache[cache_key]
     else:
-        pdt = loader.dataframe
+        loader = load_point_data_by_path(path, cheaper=cheaper)
+        if loader.cheaper:
+            pdt = loader.select(*pred_labels, series=False)
+        else:
+            pdt = loader.dataframe
+        # Pre-extract numpy arrays for each predictor column
+        cols = {lbl: pdt[lbl].to_numpy(dtype=numpy.float64) for lbl in pred_labels}
+        _pdt_cache[cache_key] = cols
 
-    counts = []
-    for row in matrix:
-        mask = numpy.ones(len(pdt), dtype=bool)
-        for p in range(num_predictors):
-            lo = row[p * 2]
-            hi = row[p * 2 + 1]
-            col = pdt[pred_labels[p]].to_numpy(dtype=numpy.float64)
-            if lo != float('-inf'):
-                mask &= (col >= lo)
-            if hi != float('inf'):
-                mask &= (col < hi)
-        counts.append(int(mask.sum()))
+    n_obs = len(next(iter(cols.values())))
 
+    # --- Optimization 2: Smart group-based counting ---
+    # For each sibling group, filter observations by shared parent conditions ONCE,
+    # then only check the leaf-level predictor for each sibling.
 
-    # Group rows into sibling groups: rows that share the same values
-    # for all predictors except the deepest differing one.
-    # A "sibling group" = rows with identical prefix up to the last split.
+    def count_all_wts(matrix):
+        """Count observations per WT using parent-group filtering + leaf-level check."""
+        counts = [0] * len(matrix)
+
+        # Group WTs by their parent conditions (all predictors except the deepest bounded one)
+        group_map = {}  # group_key -> [(matrix_index, leaf_lo, leaf_hi, leaf_predictor_index)]
+        for i, row in enumerate(matrix):
+            # Find the deepest bounded predictor (the leaf level)
+            deepest = -1
+            for p in range(num_predictors):
+                if row[p * 2] != float('-inf') or row[p * 2 + 1] != float('inf'):
+                    deepest = p
+
+            if deepest < 0:
+                # Fully unbounded WT — counts all observations
+                counts[i] = n_obs
+                continue
+
+            # Parent conditions: all predictors above the leaf level
+            parent_key = tuple(row[:deepest * 2])
+            leaf_lo = row[deepest * 2]
+            leaf_hi = row[deepest * 2 + 1]
+
+            if parent_key not in group_map:
+                group_map[parent_key] = (deepest, [])
+            group_map[parent_key][1].append((i, leaf_lo, leaf_hi))
+
+        # For each parent group: filter obs by parent conditions, then check leaf predictor
+        for parent_key, (leaf_pred_idx, members) in group_map.items():
+            # Build parent mask: filter observations by all parent-level conditions
+            parent_mask = numpy.ones(n_obs, dtype=bool)
+            for p in range(leaf_pred_idx):
+                lo = parent_key[p * 2]
+                hi = parent_key[p * 2 + 1]
+                col = cols[pred_labels[p]]
+                if lo != float('-inf'):
+                    parent_mask &= (col >= lo)
+                if hi != float('inf'):
+                    parent_mask &= (col < hi)
+
+            # Extract the leaf predictor column for the filtered subset
+            filtered_leaf_col = cols[pred_labels[leaf_pred_idx]][parent_mask]
+
+            # Now check each sibling's leaf-level range on the filtered subset
+            for mat_idx, leaf_lo, leaf_hi in members:
+                leaf_mask = numpy.ones(len(filtered_leaf_col), dtype=bool)
+                if leaf_lo != float('-inf'):
+                    leaf_mask &= (filtered_leaf_col >= leaf_lo)
+                if leaf_hi != float('inf'):
+                    leaf_mask &= (filtered_leaf_col < leaf_hi)
+                counts[mat_idx] = int(leaf_mask.sum())
+
+        return counts
+
     def get_group_key(row):
         """Return the predictor values ABOVE the deepest bounded predictor."""
-        # Find the deepest predictor that is not -inf/inf
         deepest = -1
         for p in range(num_predictors):
             lo, hi = row[p * 2], row[p * 2 + 1]
             if lo != float('-inf') or hi != float('inf'):
                 deepest = p
-        # Group key = all predictor values above the deepest one
         if deepest <= 0:
             return ()
         return tuple(row[: deepest * 2])
-
-    # Find the rightmost small WT in each sibling group
-    groups = {}
-    for i in range(len(matrix)):
-        key = get_group_key(matrix[i])
-        if key not in groups:
-            groups[key] = []
-        groups[key].append(i)
-
-    # For each sibling group, find at most ONE WT to eliminate per round.
-    # Scan ALL WTs from right to left:
-    #   - If a non-leftmost WT is below threshold, merge it into its LEFT neighbor.
-    #   - If only the leftmost is below threshold, merge it into its RIGHT neighbor.
-    # One merge per group per round.
-    to_eliminate = {}  # idx -> 'left' or 'right' (direction to merge INTO)
-    for key, members in groups.items():
-        if len(members) < 2:
-            continue
-
-        # Scan from right to left, checking ALL members
-        found = False
-        for i in range(len(members) - 1, 0, -1):  # rightmost down to index 1 (skip leftmost)
-            idx = members[i]
-            if counts[idx] < threshold:
-                to_eliminate[idx] = 'left'  # merge into left neighbor
-                found = True
-                break  # one per group per round
-
-        if not found:
-            # No non-leftmost WT was below threshold.
-            # Check the leftmost WT.
-            leftmost_idx = members[0]
-            if counts[leftmost_idx] < threshold:
-                to_eliminate[leftmost_idx] = 'right'  # merge into right neighbor
-
-    # Process eliminations: merge each eliminated row in the specified direction.
-    # Process right-to-left by index so pop() doesn't invalidate earlier indices.
-    sorted_elim = sorted(to_eliminate.keys(), reverse=True)
-    pred_label_list = [l.replace("_thrL", "") for l in labels[::2]]
 
     def merge_range(survivor, donor):
         """Expand survivor's range to cover donor's range at the deepest differing predictor."""
@@ -736,7 +749,7 @@ def eliminate_small_wts():
             if lS != lD or hS != hD:
                 survivor[p * 2] = min(lS, lD) if lS != float('-inf') and lD != float('-inf') else float('-inf')
                 survivor[p * 2 + 1] = max(hS, hD) if hS != float('inf') and hD != float('inf') else float('inf')
-                pred_name = pred_label_list[p]
+                pred_name = pred_labels[p]
                 if pred_name in ranges:
                     field_min = float(ranges[pred_name][0])
                     field_max = float(ranges[pred_name][1])
@@ -745,25 +758,76 @@ def eliminate_small_wts():
                         survivor[p * 2 + 1] = float('inf')
                 break
 
-    for idx in sorted_elim:
-        direction = to_eliminate[idx]
-        if direction == 'right':
-            # Leftmost WT: merge into right neighbor
-            if idx + 1 < len(matrix):
-                merge_range(matrix[idx + 1], matrix[idx])
-                matrix.pop(idx)
-        else:
-            # Normal case: merge into left neighbor
-            if idx - 1 >= 0:
-                merge_range(matrix[idx - 1], matrix[idx])
-                matrix.pop(idx)
+    # --- Optimization 1: Multi-round loop, eliminate ALL small WTs per group per round ---
+    max_rounds = 100  # safety limit
+    total_eliminated = 0
+    for round_num in range(max_rounds):
+        if len(matrix) < 2:
+            break
 
-    # Deduplicate identical rows
-    seen = []
-    for row in matrix:
-        if row not in seen:
-            seen.append(row)
-    matrix = seen
+        counts = count_all_wts(matrix)
+
+        # Build sibling groups
+        groups = {}
+        for i in range(len(matrix)):
+            key = get_group_key(matrix[i])
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(i)
+
+        # Collect ALL indices to remove this round
+        to_remove = set()
+
+        for key, members in groups.items():
+            if len(members) < 2:
+                continue
+
+            # Work on a local copy of the group, processing right-to-left
+            # Merge all small non-leftmost WTs first
+            local_members = list(members)  # indices into current matrix
+            merged_any = True
+            while merged_any and len(local_members) > 1:
+                merged_any = False
+                # Scan right to left, skip leftmost
+                for i in range(len(local_members) - 1, 0, -1):
+                    idx = local_members[i]
+                    if counts[idx] < threshold:
+                        # Merge into left neighbor
+                        left_idx = local_members[i - 1]
+                        merge_range(matrix[left_idx], matrix[idx])
+                        # Update count: sum both
+                        counts[left_idx] = counts[left_idx] + counts[idx]
+                        to_remove.add(idx)
+                        local_members.pop(i)
+                        merged_any = True
+                        # Don't break — continue merging more in this group
+
+            # Check leftmost: if only 2 remain and leftmost is small, merge into right
+            if len(local_members) >= 2:
+                leftmost_idx = local_members[0]
+                if counts[leftmost_idx] < threshold:
+                    right_idx = local_members[1]
+                    merge_range(matrix[right_idx], matrix[leftmost_idx])
+                    counts[right_idx] = counts[right_idx] + counts[leftmost_idx]
+                    to_remove.add(leftmost_idx)
+
+        if not to_remove:
+            break  # No more WTs to eliminate — we're done
+
+        total_eliminated += len(to_remove)
+
+        # Remove rows in reverse order to preserve indices
+        for idx in sorted(to_remove, reverse=True):
+            matrix.pop(idx)
+
+        # Deduplicate identical rows
+        seen = []
+        for row in matrix:
+            if row not in seen:
+                seen.append(row)
+        matrix = seen
+
+    elapsed = time.time() - t0
 
     # Convert back to string format for frontend
     result_matrix = []
@@ -780,11 +844,12 @@ def eliminate_small_wts():
                 str_row.append(str(val))
         result_matrix.append(str_row)
 
-    eliminated_count = len(payload["matrix"]) - len(result_matrix)
     return jsonify({
         "matrix": result_matrix,
-        "eliminated": eliminated_count,
+        "eliminated": total_eliminated,
         "remaining": len(result_matrix),
+        "rounds": round_num + 1,
+        "elapsed_seconds": round(elapsed, 2),
     })
 
 
