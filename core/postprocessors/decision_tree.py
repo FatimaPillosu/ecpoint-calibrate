@@ -370,12 +370,17 @@ class DecisionTree(object):
             bounded_idx = 0
             for j, ul in enumerate(unique_lows):
                 uh = high_vals[low_vals == ul][0]
-                is_unbounded = (
+                # Check if this bin is unbounded: either literal -inf/inf
+                # or matches the field's min/max range
+                is_literal_unbounded = (
+                    np.isneginf(float(ul)) and np.isposinf(float(uh))
+                )
+                is_range_unbounded = (
                     pred_range is not None
                     and int_or_float(ul) == pred_range[0]
                     and int_or_float(uh) == pred_range[1]
                 )
-                if is_unbounded:
+                if is_literal_unbounded or is_range_unbounded:
                     digits[j] = "0"
                 else:
                     bounded_idx += 1

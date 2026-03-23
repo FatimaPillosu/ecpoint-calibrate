@@ -166,7 +166,9 @@ def get_wt_codes():
     thrL, thrH = df.iloc[:, ::2], df.iloc[:, 1::2]
 
     dt = DecisionTree(threshold_low=thrL, threshold_high=thrH, ranges=ranges)
-    return jsonify({"codes": dt.leaf_codes})
+    # Use _leaf_codes_direct to compute codes from the matrix directly.
+    # leaf_codes (tree traversal) can miss rows when unbounded nodes are skipped.
+    return jsonify({"codes": dt._leaf_codes_direct()})
 
 
 @app.route("/postprocessing/create-decision-tree", methods=("POST",))
