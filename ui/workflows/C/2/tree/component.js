@@ -236,6 +236,8 @@ export default class TreeContainer extends Component {
     draggingV: false,
     // PDF zoom
     pdfZoom: 100,
+    // Tree zoom
+    treeZoom: 1,
   }
 
   componentDidMount() {
@@ -248,6 +250,19 @@ export default class TreeContainer extends Component {
     })
     document.addEventListener('click', this.closeContextMenu)
     document.addEventListener('contextmenu', this.handleDocumentContextMenu)
+  }
+
+  centerRoot = () => {
+    const dimensions = this.treeContainer.getBoundingClientRect()
+    const hasPanels = this.state.panels.length > 0
+    const treeWidth = hasPanels ? dimensions.width * (this.state.hSplitPercent / 100) : dimensions.width
+    this.setState({
+      translate: {
+        x: treeWidth / 2,
+        y: 40,
+      },
+      treeZoom: 1,
+    })
   }
 
   componentWillUnmount() {
@@ -1059,6 +1074,21 @@ export default class TreeContainer extends Component {
               size="tiny"
               icon
               labelPosition="left"
+              onClick={this.centerRoot}
+              title="Center and reset view to tree root"
+            >
+              <Icon name="crosshairs" />
+              Center Root
+            </Button>
+            <Button.Group size="tiny">
+              <Button icon="zoom out" onClick={() => this.setState(prev => ({ treeZoom: Math.max(0.1, prev.treeZoom - 0.15) }))} title="Zoom out tree" />
+              <Button content={`${Math.round(this.state.treeZoom * 100)}%`} basic style={{ minWidth: '55px', cursor: 'default' }} />
+              <Button icon="zoom in" onClick={() => this.setState(prev => ({ treeZoom: Math.min(3, prev.treeZoom + 0.15) }))} title="Zoom in tree" />
+            </Button.Group>
+            <Button
+              size="tiny"
+              icon
+              labelPosition="left"
               toggle
               active={comparisonMode}
               onClick={this.toggleComparisonMode}
@@ -1091,6 +1121,7 @@ export default class TreeContainer extends Component {
             <Tree
               data={this.props.data}
               translate={this.state.translate}
+              zoom={this.state.treeZoom}
               orientation="vertical"
               allowForeignObjects
               renderCustomNodeElement={nodeProps => (
