@@ -76,9 +76,62 @@ class SparseBreakpoints extends Component {
     return (
       <Item>
         <Item.Content style={{ display: 'grid' }}>
-          <Item.Header>
-            <h5>Input the threshold breakpoints in the following spreadsheet:</h5>
-          </Item.Header>
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: '4px' }}>Create a Symmetric Decision Tree</div>
+            <div style={{ fontSize: '13px', color: '#555' }}>Input the threshold breakpoints in the following table.</div>
+            <div style={{ fontSize: '13px', color: '#888', fontStyle: 'italic', marginTop: '4px' }}>
+              Valid values are <Label size="mini">-inf</Label>, <Label size="mini">inf</Label>, and all integers.
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            <Button
+              content="+ Add row"
+              size="small"
+              style={{ minWidth: '110px', fontFamily: "'Work Sans', sans-serif", fontWeight: 400, background: '#0d9488', color: '#fff' }}
+              onClick={() => this.appendBlankRow()}
+            />
+            <Button
+              content="Generate Symmetric DT"
+              size="small"
+              style={{ minWidth: '180px', fontFamily: "'Work Sans', sans-serif", fontWeight: 400, background: '#0d9488', color: '#fff' }}
+              onClick={() => {
+                this.postThrGridIn()
+                if (this.props.onTreeGenerated) this.props.onTreeGenerated()
+              }}
+              disabled={this.hasError()}
+            />
+            {this.props.hierarchyChanged && (() => {
+              const dataRows = this.props.sparseBreakpoints.slice(1)
+              const hasCustomValues = dataRows.some(row =>
+                row.slice(1).some(cell => {
+                  const v = String(cell.value).trim()
+                  return v !== '' && v !== '-inf' && v !== 'inf'
+                })
+              )
+              return hasCustomValues ? (
+                <span style={{ fontSize: '12px', color: '#d32f2f', fontWeight: 'bold', fontFamily: "'Work Sans', sans-serif" }}>
+                  ⚠️ Hierarchy modified! Generate the new symmetrical decision tree.
+                </span>
+              ) : null
+            })()}
+            <Button
+              content="Reset DT (Root)"
+              size="small"
+              style={{ marginLeft: 'auto', minWidth: '150px', fontFamily: "'Work Sans', sans-serif", fontWeight: 400, background: '#999', color: '#fff' }}
+              onClick={() => {
+                const headerRow = this.props.sparseBreakpoints[0]
+                const blankRow = [{ readOnly: true, value: 1 }].concat(
+                  _.flatMap(this.props.fields, () => [{ value: '-inf' }, { value: 'inf' }])
+                )
+                this.props.setSparseBreakpoints([headerRow, blankRow])
+                // Auto-generate the decision tree after reset
+                setTimeout(() => {
+                  this.postThrGridIn()
+                  if (this.props.onTreeGenerated) this.props.onTreeGenerated()
+                }, 100)
+              }}
+            />
+          </div>
           <Item.Description style={{ overflowX: 'scroll' }}>
             <ReactDataSheet
               data={this.props.sparseBreakpoints}
@@ -126,25 +179,20 @@ class SparseBreakpoints extends Component {
               }}
             />
           </Item.Description>
-          <Item.Extra>
+
+          {/* Asymmetric Decision Tree section */}
+          <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e0e0e0' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: '4px' }}>Create an Asymmetric Decision Tree</div>
+            <div style={{ fontSize: '13px', color: '#555', marginBottom: '10px' }}>
+              Import a CSV table containing the breakpoints for an asymmetric decision tree.
+            </div>
             <Button
-              content="Generate WTs"
-              floated="right"
-              size="mini"
-              onClick={() => this.postThrGridIn()}
-              disabled={this.hasError()}
-              primary
+              content="Generate Asymmetric DT (CSV)"
+              size="small"
+              style={{ minWidth: '220px', fontFamily: "'Work Sans', sans-serif", fontWeight: 400, background: '#0d9488', color: '#fff' }}
+              onClick={() => this.props.onSaveOperationClicked('breakpoints-upload')}
             />
-            <Button
-              content="Add row"
-              floated="right"
-              primary
-              size="mini"
-              onClick={() => this.appendBlankRow()}
-            />
-            <br />
-            Valid values are <Label>-inf</Label>, <Label>inf</Label>, and all integers.
-          </Item.Extra>
+          </div>
         </Item.Content>
       </Item>
     )

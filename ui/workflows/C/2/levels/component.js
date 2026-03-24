@@ -33,8 +33,9 @@ const SortableList = SortableContainer(
     setFields,
     setBreakpoints,
     addExcludedPredictor,
+    onHierarchyChanged,
   }) => (
-    <Segment.Group raised size="mini" style={{ width: '20%' }}>
+    <Segment.Group raised size="small" style={{ width: '100%' }}>
       {items.map((value, index) => (
         <SortableItem
           key={`item-${index}`}
@@ -45,13 +46,14 @@ const SortableList = SortableContainer(
             setFields(items.slice(0, -1))
 
             const matrix = breakpoints
-              .map(row => _.flatMap(row.slice(1)))
+              .map(row => _.flatMap(row.slice(2)))
               .map(row => row.slice(0, -2))
             const newLabels = labels.slice(0, -2)
 
             const excludePredictor = labels.slice(-2)[0].replace('_thrL', '')
             addExcludedPredictor(excludePredictor)
             setBreakpoints(newLabels, matrix, fieldRanges)
+            if (onHierarchyChanged) onHierarchyChanged()
           }}
         />
       ))}
@@ -62,7 +64,10 @@ const SortableList = SortableContainer(
 const Levels = props => {
   return (
     <>
-      <h5>Rearrange the levels of the decision tree below:</h5>
+      <div style={{ marginBottom: '8px' }}>
+        <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: '4px' }}>Decision Tree Hierarchy</div>
+        <div style={{ fontSize: '13px', color: '#555' }}>Rearrange the decision tree levels below.</div>
+      </div>
 
       <SortableList
         items={props.fields}
@@ -72,7 +77,8 @@ const Levels = props => {
         fieldRanges={props.fieldRanges}
         breakpoints={props.thrGridOut}
         labels={props.labels}
-        onSortEnd={({ oldIndex, newIndex }) =>
+        onHierarchyChanged={props.onHierarchyChanged}
+        onSortEnd={({ oldIndex, newIndex }) => {
           props.onFieldsSortEnd(
             props.fields,
             props.thrGridIn,
@@ -81,13 +87,10 @@ const Levels = props => {
             newIndex,
             props.fieldRanges
           )
-        }
+          if (oldIndex !== newIndex && props.onHierarchyChanged) props.onHierarchyChanged()
+        }}
         useDragHandle
       />
-      <small>
-        <b>⚠️ Caution:</b> Modifying the current arrangement will partially clear the
-        threshold breakpoints in the sheet below.
-      </small>
     </>
   )
 }

@@ -21,7 +21,7 @@ const MenuFactory = config => props => (
         >
           <Icon name={icon} />
           <Step.Content>
-            <Step.Title>{title}</Step.Title>
+            <Step.Title style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '14px' }}>{title}</Step.Title>
           </Step.Content>
         </Step>
       )

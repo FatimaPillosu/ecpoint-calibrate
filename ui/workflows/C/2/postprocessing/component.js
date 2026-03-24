@@ -9,6 +9,8 @@ import Levels from '../levels'
 import SaveOperation from '../saveOperation'
 
 class PostProcessing extends Component {
+  state = { hierarchyChanged: false }
+
   isComplete = () => true
 
   yLimHasError = () =>
@@ -83,9 +85,34 @@ class PostProcessing extends Component {
           <Grid.Column>
             <Card fluid color="black">
               <Card.Header>
-                <Grid.Column floated="left">Decision Tree</Grid.Column>
-                <Grid.Column floated="right">
-                  {this.isComplete() && <Icon name="check circle" />}
+                <Grid.Column floated="left">Create a New Decision Tree</Grid.Column>
+              </Card.Header>
+              <Card.Content>
+                <Card.Description>
+                  <Item.Group divided>
+                    <Dimmer active={!!this.props.loading}>
+                      <Loader indeterminate>{this.props.loading}</Loader>
+                    </Dimmer>
+                    <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', marginBottom: '16px' }}>
+                      <div style={{ width: '200px', flexShrink: 0 }}>
+                        <Levels onHierarchyChanged={() => this.setState({ hierarchyChanged: true })} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <SparseBreakPoints
+                          hierarchyChanged={this.state.hierarchyChanged}
+                          onTreeGenerated={() => this.setState({ hierarchyChanged: false })}
+                        />
+                      </div>
+                    </div>
+                  </Item.Group>
+                </Card.Description>
+              </Card.Content>
+            </Card>
+
+            <Card fluid color="black" style={{ marginTop: '20px' }}>
+              <Card.Header>
+                <Grid.Column floated="left">
+                  Tabular Decision Tree{this.props.thrGridOut.length > 0 && ` (${this.props.thrGridOut.length} WTs)`}
                 </Grid.Column>
               </Card.Header>
               <Card.Content>
@@ -94,10 +121,19 @@ class PostProcessing extends Component {
                     <Dimmer active={!!this.props.loading}>
                       <Loader indeterminate>{this.props.loading}</Loader>
                     </Dimmer>
-                    <Levels />
-                    <SparseBreakPoints />
                     <BreakPoints />
+                  </Item.Group>
+                </Card.Description>
+              </Card.Content>
+            </Card>
 
+            <Card fluid color="black" style={{ marginTop: '20px' }}>
+              <Card.Header>
+                <Grid.Column floated="left">Temp</Grid.Column>
+              </Card.Header>
+              <Card.Content>
+                <Card.Description>
+                  <Item.Group divided>
                     {/* Hide tree until loading is finished for better experience */}
                     {!this.props.loading && (
                       <>

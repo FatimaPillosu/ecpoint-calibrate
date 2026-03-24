@@ -171,6 +171,70 @@ def get_wt_codes():
     return jsonify({"codes": dt._leaf_codes_direct()})
 
 
+@app.route("/postprocessing/count-wt-observations", methods=("POST",))
+def count_wt_observations():
+    """Count observations per WT using group-based parent filtering."""
+    payload = request.get_json()
+    labels = payload["labels"]
+    matrix = [[float(cell) for cell in row] for row in payload["matrix"]]
+    path = sanitize_path(payload["path"])
+    cheaper = payload.get("cheaper", False)
+
+    num_predictors = len(matrix[0]) // 2
+    pred_labels = [l.replace("_thrL", "") for l in labels[::2]]
+
+    # Load PDT (use cache if available)
+    cache_key = (path, cheaper, tuple(pred_labels))
+    if cache_key in _pdt_cache:
+        cols = _pdt_cache[cache_key]
+    else:
+        loader = load_point_data_by_path(path, cheaper=cheaper)
+        if loader.cheaper:
+            pdt = loader.select(*pred_labels, series=False)
+        else:
+            pdt = loader.dataframe
+        cols = {lbl: pdt[lbl].to_numpy(dtype=numpy.float64) for lbl in pred_labels}
+        _pdt_cache[cache_key] = cols
+
+    n_obs = len(next(iter(cols.values())))
+
+    # Group-based counting (same logic as eliminate-small-wts)
+    counts = [0] * len(matrix)
+    group_map = {}
+    for i, row in enumerate(matrix):
+        deepest = -1
+        for p in range(num_predictors):
+            if row[p * 2] != float('-inf') or row[p * 2 + 1] != float('inf'):
+                deepest = p
+        if deepest < 0:
+            counts[i] = n_obs
+            continue
+        parent_key = tuple(row[:deepest * 2])
+        if parent_key not in group_map:
+            group_map[parent_key] = (deepest, [])
+        group_map[parent_key][1].append((i, row[deepest * 2], row[deepest * 2 + 1]))
+
+    for parent_key, (leaf_pred_idx, members) in group_map.items():
+        parent_mask = numpy.ones(n_obs, dtype=bool)
+        for p in range(leaf_pred_idx):
+            lo, hi = parent_key[p * 2], parent_key[p * 2 + 1]
+            col = cols[pred_labels[p]]
+            if lo != float('-inf'):
+                parent_mask &= (col >= lo)
+            if hi != float('inf'):
+                parent_mask &= (col < hi)
+        filtered = cols[pred_labels[leaf_pred_idx]][parent_mask]
+        for mat_idx, leaf_lo, leaf_hi in members:
+            m = numpy.ones(len(filtered), dtype=bool)
+            if leaf_lo != float('-inf'):
+                m &= (filtered >= leaf_lo)
+            if leaf_hi != float('inf'):
+                m &= (filtered < leaf_hi)
+            counts[mat_idx] = int(m.sum())
+
+    return jsonify({"counts": counts})
+
+
 @app.route("/postprocessing/create-decision-tree", methods=("POST",))
 def get_decision_tree():
     payload = request.get_json()
@@ -846,12 +910,19 @@ def eliminate_small_wts():
                 str_row.append(str(val))
         result_matrix.append(str_row)
 
+    # Final validation: count total observations across all remaining WTs
+    final_counts = count_all_wts(matrix)
+    total_obs_after = int(sum(final_counts))
+    total_obs_pdt = n_obs
+
     return jsonify({
         "matrix": result_matrix,
         "eliminated": total_eliminated,
         "remaining": len(result_matrix),
         "rounds": round_num + 1,
         "elapsed_seconds": round(elapsed, 2),
+        "total_obs_after": total_obs_after,
+        "total_obs_pdt": total_obs_pdt,
     })
 
 

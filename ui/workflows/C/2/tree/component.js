@@ -241,6 +241,10 @@ export default class TreeContainer extends Component {
     // WT count and elimination
     minObsThreshold: '',
     eliminatingWTs: false,
+    // Add WTs to all leaves
+    showAddWTs: false,
+    addWTsPredictor: '',
+    addWTsBreakpoints: '',
   }
 
   componentDidMount() {
@@ -270,7 +274,7 @@ export default class TreeContainer extends Component {
 
     this.setState({ eliminatingWTs: true })
 
-    const matrix = this.props.breakpoints.map(row => _.flatMap(row.slice(1)))
+    const matrix = this.props.breakpoints.map(row => _.flatMap(row.slice(2)))
 
     client
       .post('/postprocessing/eliminate-small-wts', {
@@ -282,7 +286,7 @@ export default class TreeContainer extends Component {
         threshold,
       })
       .then(response => {
-        const { matrix: newMatrix, eliminated, remaining } = response.data
+        const { matrix: newMatrix, eliminated, remaining, rounds, elapsed_seconds, total_obs_after, total_obs_pdt } = response.data
 
         if (eliminated === 0) {
           alert('No WTs have fewer than ' + threshold + ' observations.')
@@ -302,13 +306,69 @@ export default class TreeContainer extends Component {
             translate: savedTranslate,
             treeZoom: savedZoom,
           })
-          alert(`Merged ${eliminated} WTs (< ${threshold} obs) into neighbors. ${remaining} WTs remaining.`)
+          const obsMatch = total_obs_after === total_obs_pdt ? '✓ PASS' : '✗ MISMATCH'
+          const fmtAfter = total_obs_after >= 1e6 ? (total_obs_after / 1e6).toFixed(2) + 'M' : total_obs_after >= 1e3 ? (total_obs_after / 1e3).toFixed(2) + 'K' : total_obs_after
+          const fmtPdt = total_obs_pdt >= 1e6 ? (total_obs_pdt / 1e6).toFixed(2) + 'M' : total_obs_pdt >= 1e3 ? (total_obs_pdt / 1e3).toFixed(2) + 'K' : total_obs_pdt
+          alert(`Eliminated ${eliminated} WTs in ${rounds} rounds (${elapsed_seconds}s).\n${remaining} WTs remaining.\n\nData-point check: ${fmtAfter} / ${fmtPdt} ${obsMatch}`)
         }, 200)
       })
       .catch(err => {
         this.setState({ eliminatingWTs: false })
         errorHandler(err)
       })
+  }
+
+  addWTsToAllLeaves = () => {
+    const level = this.state.addWTsPredictor
+    const breakpointsStr = this.state.addWTsBreakpoints
+    if (level === '' || level === undefined || !breakpointsStr) return
+
+    const values = breakpointsStr.split('/').map(v => v.trim()).filter(v => v !== '')
+    if (values.length === 0) return
+
+    // Parse and sort in descending order (so splits don't shift indices)
+    const sortedValues = values.map(parseFloat).sort((a, b) => b - a).map(String)
+
+    // Get current matrix (without WT code and count columns)
+    let matrix = this.props.breakpoints.map(row => [..._.flatMap(row.slice(2))])
+
+    // Find all leaf indices — leaves are rows that represent the deepest level of each WT
+    // We need to split each existing row at the given level
+    // Process from last row to first to avoid index shifting
+    for (let i = matrix.length - 1; i >= 0; i--) {
+      // Check if this row already has a non-unbounded range at this level
+      const thrL = matrix[i][level * 2]
+      const thrH = matrix[i][level * 2 + 1]
+
+      // Only split if the range at this level is unbounded (-inf to inf)
+      // meaning this predictor hasn't been split yet for this WT
+      if (thrL === '-inf' && thrH === 'inf') {
+        // Apply each breakpoint value (in descending order)
+        sortedValues.forEach(value => {
+          const source = [...matrix[i]]
+          const newWt = [...matrix[i]]
+          newWt[level * 2] = value
+          newWt[level * 2 + 1] = source[level * 2 + 1]
+          source[level * 2 + 1] = value
+          matrix = [..._.slice(matrix, 0, i), source, newWt, ..._.slice(matrix, i + 1)]
+        })
+      }
+    }
+
+    // Save view state
+    const savedTranslate = { ...this.state.translate }
+    const savedZoom = this.state.treeZoom
+
+    this.props.setBreakpoints(this.props.labels, matrix, this.props.fieldRanges)
+
+    setTimeout(() => {
+      this.setState({
+        translate: savedTranslate,
+        treeZoom: savedZoom,
+        showAddWTs: false,
+        addWTsBreakpoints: '',
+      })
+    }, 200)
   }
 
   centerRoot = () => {
@@ -385,7 +445,7 @@ export default class TreeContainer extends Component {
 
   getMergedMatrix(node) {
     const matrix = this.props.breakpoints
-      .map(row => _.flatMap(row.slice(1)))
+      .map(row => _.flatMap(row.slice(2)))
       .map(inner => inner.slice())
 
     if (node.children.length === 0) {
@@ -417,7 +477,7 @@ export default class TreeContainer extends Component {
     this.setState({ loading: 'Expanding node. Please wait.' })
 
     const matrix = this.props.breakpoints
-      .map(row => _.flatMap(row.slice(1)))
+      .map(row => _.flatMap(row.slice(2)))
 
     client
       .post('/postprocessing/expand-tree-node', {
@@ -529,7 +589,7 @@ export default class TreeContainer extends Component {
       [CV_MODES_MAP.STD_DEV]: 'Std Dev',
     }
     const code = node.meta.code
-    const thrWT = this.props.breakpoints.map(row => _.flatMap(row.slice(1)))[node.meta.idxWT]
+    const thrWT = this.props.breakpoints.map(row => _.flatMap(row.slice(2)))[node.meta.idxWT]
     const slotIndex = this.addResultPanel(
       code, 'cv',
       `WT ${code} - CV ${cvLabels[cvMode]}`
@@ -723,7 +783,7 @@ export default class TreeContainer extends Component {
       const leafIdx = node.meta.idxWT
       console.log('Merge leaf idx:', leafIdx, 'meta:', JSON.stringify(node.meta))
 
-      const originalMatrix = this.props.breakpoints.map(row => _.flatMap(row.slice(1)))
+      const originalMatrix = this.props.breakpoints.map(row => _.flatMap(row.slice(2)))
 
       console.log('=== Merge Leaf ===')
       console.log('leafIdx:', leafIdx)
@@ -1245,6 +1305,64 @@ export default class TreeContainer extends Component {
                 Eliminate
               </Button>
             </div>
+
+            {/* Add WTs to all leaves */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Button
+                size="tiny"
+                icon
+                labelPosition="left"
+                style={{ backgroundColor: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif" }}
+                onClick={() => this.setState({ showAddWTs: !this.state.showAddWTs })}
+                title="Add breakpoints to all leaves at a selected predictor level"
+              >
+                <Icon name="plus" />
+                Add WTs
+              </Button>
+            </div>
+
+            {this.state.showAddWTs && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', background: '#f0fdfa', borderRadius: '6px', border: '1px solid #0d948830' }}>
+                <select
+                  value={this.state.addWTsPredictor || ''}
+                  onChange={e => this.setState({ addWTsPredictor: parseInt(e.target.value) })}
+                  style={{
+                    padding: '4px 8px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontFamily: "'Work Sans', sans-serif",
+                  }}
+                >
+                  <option value="" disabled>Select predictor</option>
+                  {this.props.fields && this.props.fields.map((field, idx) => (
+                    <option key={idx} value={idx}>{field}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="e.g. 0.25/0.5/0.75"
+                  value={this.state.addWTsBreakpoints || ''}
+                  onChange={e => this.setState({ addWTsBreakpoints: e.target.value })}
+                  style={{
+                    width: '160px',
+                    padding: '4px 6px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontFamily: "'Work Sans', sans-serif",
+                  }}
+                />
+                <Button
+                  size="tiny"
+                  style={{ backgroundColor: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif" }}
+                  onClick={this.addWTsToAllLeaves}
+                  disabled={!this.state.addWTsPredictor && this.state.addWTsPredictor !== 0 || !this.state.addWTsBreakpoints}
+                >
+                  Split All Leaves
+                </Button>
+              </div>
+            )}
           </div>
           <Button
             content="Save tree as PNG"

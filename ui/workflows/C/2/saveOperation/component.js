@@ -22,7 +22,7 @@ const defaultState = {
 
 const SecondaryText = ({ text, divider }) => (
   <>
-    <p style={{ color: 'grey', paddingTop: '5px' }}>{text}</p>
+    <p style={{ color: '#666', paddingTop: '5px', fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px' }}>{text}</p>
     {divider && <Divider />}
   </>
 )
@@ -60,8 +60,8 @@ class SaveOperation extends Component {
   }
 
   getMetadataComponent = () => (
-    <Segment padded>
-      <h5>Enter operation metadata:</h5>
+    <Segment padded style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>
+      <h5 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '14px', color: '#333' }}>Enter operation metadata:</h5>
 
       <Input
         label="Dataset Name*"
@@ -96,29 +96,35 @@ class SaveOperation extends Component {
         divider
       />
 
-      <p>Fields marked with * are mandatory.</p>
+      <p style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#666' }}>Fields marked with * are mandatory.</p>
     </Segment>
   )
 
   getBreakpointsCSVComponent = () => (
-    <Segment padded>
-      <h5>
-        Enter parameters for {this.props.mode === 'breakpoints' ? 'saving' : 'loading'}{' '}
-        breakpoints in Weather Types as CSV:
+    <Segment padded style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>
+      <h5 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '14px', color: '#333' }}>
+        {this.props.mode === 'breakpoints'
+          ? 'Enter parameters for saving breakpoints in Weather Types as CSV:'
+          : null}
       </h5>
+      {this.props.mode !== 'breakpoints' && (
+        <p style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', marginBottom: '10px' }}>
+          Insert the numerical value or string representing the "Infinity" value in the CSV table:
+        </p>
+      )}
 
       <Input
         label="Infinity value"
         value={this.state.inf}
         onChange={e => this.setState({ inf: e.target.value })}
+        style={{ fontFamily: "'Work Sans', sans-serif" }}
       />
-      <SecondaryText text={`Numerical value to substitute the "Infinity" value`} />
     </Segment>
   )
 
   getMFsCSVComponent = () => (
-    <Segment padded>
-      <h5>Enter parameters for saving Mapping Functions as CSV:</h5>
+    <Segment padded style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>
+      <h5 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '14px', color: '#333' }}>Enter parameters for saving Mapping Functions as CSV:</h5>
 
       <Input
         label="No. of post-processed members*"
@@ -150,14 +156,14 @@ class SaveOperation extends Component {
   }
 
   getOutputPathComponent = () => (
-    <Segment padded>
-      <h5>Select path:</h5>
+    <Segment padded style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>
+      <p style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', marginBottom: '10px' }}>Select path:</p>
       <Button
         as="div"
         labelPosition="right"
         onClick={() => this.setState({ fileBrowserOpen: true })}
       >
-        <Button icon>
+        <Button icon style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 400 }}>
           <Icon name="save" />
           Browse
         </Button>
@@ -176,7 +182,7 @@ class SaveOperation extends Component {
     } else if (this.props.mode === 'breakpoints') {
       return 'Save Breakpoints for Weather Types as CSV'
     } else if (this.props.mode === 'breakpoints-upload') {
-      return 'Upload Breakpoints CSV'
+      return 'Upload Asymmetric DT (CSV)'
     } else if (this.props.mode === 'wt') {
       return 'Save Weather Types as PNG'
     } else if (this.props.mode === 'bias') {
@@ -214,7 +220,7 @@ class SaveOperation extends Component {
 
   save = () => {
     this.props.setLoading('Saving...')
-    const matrix = this.props.breakpoints.map(row => _.flatMap(row.slice(1)))
+    const matrix = this.props.breakpoints.map(row => _.flatMap(row.slice(2)))
 
     client
       .post('/postprocessing/save', {
@@ -250,8 +256,8 @@ class SaveOperation extends Component {
       this.props.mode !== null && (
         <>
           <Modal size={'large'} open={this.props.open} onClose={this.close}>
-            <Modal.Header>{this.getHeader()}</Modal.Header>
-            <Modal.Content>
+            <Modal.Header style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '18px', color: '#333' }}>{this.getHeader()}</Modal.Header>
+            <Modal.Content style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, color: '#333' }}>
               {this.props.mode === 'all' && this.getMetadataComponent()}
               {(this.props.mode === 'all' ||
                 this.props.mode === 'breakpoints' ||
@@ -263,10 +269,10 @@ class SaveOperation extends Component {
             </Modal.Content>
             <Modal.Actions>
               <Button
-                color="green"
                 icon={this.props.mode === 'breakpoints-upload' ? 'upload' : 'download'}
                 content={this.props.mode === 'breakpoints-upload' ? 'Upload' : 'Save'}
                 disabled={this.isEmpty()}
+                style={{ background: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif", fontWeight: 400 }}
                 onClick={() =>
                   this.props.mode === 'breakpoints-upload'
                     ? this.setBreakpointsCSV()

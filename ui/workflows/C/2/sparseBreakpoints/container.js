@@ -4,6 +4,7 @@ import SparseBreakpoints from './component'
 
 import { setBreakpoints as setSparseBreakpoints } from './actions'
 import { setBreakpoints } from '../breakpoints/actions'
+import { onSaveOperationClicked } from '../postprocessing/actions'
 
 const mapStateToProps = state => ({
   sparseBreakpoints: state.postprocessing.thrGridIn,
@@ -17,6 +18,7 @@ const mapDispatchToProps = dispatch => ({
   setSparseBreakpoints: grid => dispatch(setSparseBreakpoints(grid)),
   setBreakpoints: (labels, matrix, fieldRanges) =>
     dispatch(setBreakpoints(labels, matrix, fieldRanges)),
+  onSaveOperationClicked: mode => dispatch(onSaveOperationClicked(mode)),
 })
 
 export default connect(

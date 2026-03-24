@@ -103,31 +103,18 @@ export default class Header extends Component {
                 </Dropdown.Menu>
               </Dropdown>
             ) : (
-              <Dropdown item text="Menu">
+              <Dropdown item trigger={<Icon name="bars" size="large" style={{ margin: 0 }} />}>
                 <Dropdown.Menu>
-                  {['B', 'C'].includes(this.props.workflow) && (
+                  {this.props.workflow === 'B' && (
                     <MenuFragment title="Import">
-                      {this.props.workflow === 'C' && (
-                        <Dropdown.Item
-                          disabled={this.props.page.activePageNumber !== 2}
-                          onClick={() =>
-                            this.props.onSaveOperationClicked('breakpoints-upload')
-                          }
-                        >
-                          Breakpoints (CSV)
-                        </Dropdown.Item>
-                      )}
-
-                      {this.props.workflow === 'B' && (
-                        <Dropdown.Item
-                          disabled={this.props.page.activePageNumber === 3}
-                          onClick={() =>
-                            this.openFileBrowser('openFile', 'importWorkflow', '*.json')
-                          }
-                        >
-                          Workflow
-                        </Dropdown.Item>
-                      )}
+                      <Dropdown.Item
+                        disabled={this.props.page.activePageNumber === 3}
+                        onClick={() =>
+                          this.openFileBrowser('openFile', 'importWorkflow', '*.json')
+                        }
+                      >
+                        Workflow
+                      </Dropdown.Item>
                     </MenuFragment>
                   )}
 

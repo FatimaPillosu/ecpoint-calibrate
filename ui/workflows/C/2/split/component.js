@@ -80,7 +80,7 @@ class Split extends Component {
   }
 
   getMatrixAfterSplit = () => {
-    let matrix = [...this.props.breakpoints.map(row => [..._.flatMap(row.slice(1))])]
+    let matrix = [...this.props.breakpoints.map(row => [..._.flatMap(row.slice(2))])]
 
     const values = flow(
       map(parseFloat),
@@ -122,7 +122,7 @@ class Split extends Component {
     client
       .post('/postprocessing/breakpoints/suggest', {
         labels: this.props.labels,
-        thrWT: this.props.breakpoints.map(row => _.flatMap(row.slice(1)))[
+        thrWT: this.props.breakpoints.map(row => _.flatMap(row.slice(2)))[
           this.props.nodeMeta.idxWT
         ],
         path: this.props.path,

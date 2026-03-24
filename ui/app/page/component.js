@@ -25,11 +25,11 @@ const WorkflowB_Menu = MenuFactory([
 const WorkflowC_Menu = MenuFactory([
   {
     icon: 'chart bar',
-    title: 'Input Parameters',
+    title: 'Upload Point Data Table',
   },
   {
     icon: 'cogs',
-    title: 'Post-Processing',
+    title: 'Create Decision Tree',
   },
 ])
 
