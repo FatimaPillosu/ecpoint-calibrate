@@ -352,6 +352,15 @@ class DecisionTree(object):
         Compute leaf codes directly from threshold matrices without building
         the full tree.  Uses vectorized numpy operations — O(n × p) with
         minimal Python-loop overhead.
+
+        FIX for WT-CODE-SKIP-LEVEL-001: Each row's own (low, high) pair is
+        checked individually for unbounded status, rather than using a global
+        unique-lows lookup that conflates bounded/unbounded rows sharing the
+        same low value.
+
+        FIX for WT-CODE-RENUMBER-001: Digits are assigned as sequential ranks
+        within each sibling group (rows sharing the same parent conditions),
+        not globally. This ensures correct renumbering after leftmost merges.
         """
         p = len(self.predictors)
         n = self.num_wt
@@ -363,32 +372,50 @@ class DecisionTree(object):
 
             low_vals = self.threshold_low.iloc[:, i].to_numpy()
             high_vals = self.threshold_high.iloc[:, i].to_numpy()
-            unique_lows = np.sort(np.unique(low_vals))
 
-            # Digit for each unique bin (small loop — typically 3–10 bins)
-            digits = np.empty(len(unique_lows), dtype="U1")
-            bounded_idx = 0
-            for j, ul in enumerate(unique_lows):
-                uh = high_vals[low_vals == ul][0]
-                # Check if this bin is unbounded: either literal -inf/inf
-                # or matches the field's min/max range
-                is_literal_unbounded = (
-                    np.isneginf(float(ul)) and np.isposinf(float(uh))
-                )
-                is_range_unbounded = (
+            # Step 1: Mark each row as unbounded or bounded at this predictor
+            is_unbounded = np.zeros(n, dtype=bool)
+            for row_idx in range(n):
+                ul, uh = float(low_vals[row_idx]), float(high_vals[row_idx])
+                is_literal = np.isneginf(ul) and np.isposinf(uh)
+                is_range = (
                     pred_range is not None
-                    and int_or_float(ul) == pred_range[0]
-                    and int_or_float(uh) == pred_range[1]
+                    and int_or_float(low_vals[row_idx]) == pred_range[0]
+                    and int_or_float(high_vals[row_idx]) == pred_range[1]
                 )
-                if is_literal_unbounded or is_range_unbounded:
-                    digits[j] = "0"
-                else:
-                    bounded_idx += 1
-                    digits[j] = str(bounded_idx)
+                if is_literal or is_range:
+                    is_unbounded[row_idx] = True
 
-            # Vectorized mapping: searchsorted + fancy indexing
-            bin_indices = np.searchsorted(unique_lows, low_vals)
-            codes[:, i] = digits[bin_indices]
+            # Step 2: Build parent key for each row (all predictor levels above i)
+            # so we can group siblings and assign sequential digits within groups
+            parent_keys = []
+            for row_idx in range(n):
+                key_parts = []
+                for j in range(i):
+                    key_parts.append(str(self.threshold_low.iloc[row_idx, j]))
+                    key_parts.append(str(self.threshold_high.iloc[row_idx, j]))
+                parent_keys.append(tuple(key_parts))
+
+            # Step 3: Within each sibling group, find unique sorted lows
+            # and assign sequential digits (1, 2, 3, ...) based on rank
+            from collections import defaultdict
+            group_lows = defaultdict(set)
+            for row_idx in range(n):
+                if not is_unbounded[row_idx]:
+                    group_lows[parent_keys[row_idx]].add(low_vals[row_idx])
+
+            # Build per-group mapping: low value -> sequential digit
+            group_digit_map = {}
+            for key, lows in group_lows.items():
+                sorted_lows = sorted(lows)
+                group_digit_map[key] = {lv: str(idx + 1) for idx, lv in enumerate(sorted_lows)}
+
+            for row_idx in range(n):
+                if is_unbounded[row_idx]:
+                    codes[row_idx, i] = "0"
+                else:
+                    parent_key = parent_keys[row_idx]
+                    codes[row_idx, i] = group_digit_map[parent_key][low_vals[row_idx]]
 
         # Join columns into strings using numpy char operations
         result = codes[:, 0]

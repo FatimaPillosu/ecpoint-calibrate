@@ -22,6 +22,7 @@ ecPoint-Calibrate v1.0.1 — A web-based GUI for conditional verification and ca
 ### Eval directory: `.claude/evals/`
 - `wt-code-generation.md` — WT code digit assignment when predictor levels are skipped
 - `wt-export-evaluation-mismatch.md` — Exported WT histograms don't match in-app (dual code path bug)
+- `wt-code-renumbering-after-leftmost-merge.md` — WT codes not renumbered after leftmost merge
 
 ## Brand Guidelines
 - **Headings**: Poppins (500-700 weight)
