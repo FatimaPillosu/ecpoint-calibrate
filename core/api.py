@@ -57,6 +57,50 @@ def handle_error(e):
 is_computation_running = False
 
 
+def evaluate_wts_direct(thrL_out, thrH_out, loader, error_col):
+    """Direct per-WT threshold evaluation.
+
+    Unlike evaluate_all() which assumes a Cartesian product matrix structure,
+    this checks each WT's threshold conditions independently — safe for
+    asymmetric / pruned / merged trees.
+
+    Returns (wt_indices, error_values) where wt_indices[i] is the WT index
+    for observation i. Observations not matching any WT get wt_indices == -1.
+    """
+    import numpy as np
+
+    pred_names_low = list(thrL_out.columns)
+    pred_cols = [p.replace("_thrL", "") for p in pred_names_low]
+
+    # Pre-load all predictor data arrays
+    pred_arrays = []
+    for col_name in pred_cols:
+        if col_name in loader.dataframe.columns:
+            pred_arrays.append(loader.dataframe[col_name].to_numpy(dtype=np.float64))
+        else:
+            pred_arrays.append(None)
+
+    error_values = loader.dataframe[error_col].to_numpy()
+    n_obs = len(error_values)
+    n_wts = len(thrL_out)
+    wt_indices = np.full(n_obs, -1, dtype=np.int32)
+
+    for wt_idx in range(n_wts):
+        mask = np.ones(n_obs, dtype=bool)
+        for p_idx in range(len(pred_cols)):
+            if pred_arrays[p_idx] is None:
+                continue
+            lo = float(thrL_out.iloc[wt_idx, p_idx])
+            hi = float(thrH_out.iloc[wt_idx, p_idx])
+            if np.isneginf(lo) and np.isposinf(hi):
+                continue  # unbounded — skip check
+            vals = pred_arrays[p_idx]
+            mask &= (vals >= lo) & (vals < hi)
+        wt_indices[mask & (wt_indices == -1)] = wt_idx
+
+    return wt_indices, error_values
+
+
 @app.route("/computations/start", methods=("POST",))
 def start_computation():
     payload = request.get_json()
@@ -343,11 +387,11 @@ def save_wt_histograms():
 
     thrL_out, thrH_out = df.iloc[:, ::2], df.iloc[:, 1::2]
 
-    # Vectorized: assign all rows to WTs in a single pass
-    dt = DecisionTree(threshold_low=thrL_out, threshold_high=thrH_out, ranges={})
+    # Direct per-WT evaluation (safe for asymmetric/pruned trees)
     error_col = loader.error_type.name
-    wt_indices, eval_df = dt.evaluate_all(loader, error_col)
-    error_values = eval_df[error_col].to_numpy()
+    wt_indices, error_values = evaluate_wts_direct(thrL_out, thrH_out, loader, error_col)
+
+    dt = DecisionTree(threshold_low=thrL_out, threshold_high=thrH_out, ranges={})
 
     for idx in range(len(thrL_out)):
         mask = wt_indices == idx
@@ -471,11 +515,11 @@ def save_operation():
             path = path / "WTs"
             os.makedirs(path, exist_ok=True)
 
-        # Vectorized: single-pass WT assignment
-        dt = DecisionTree(threshold_low=thrL_out, threshold_high=thrH_out, ranges=ranges)
+        # Direct per-WT evaluation (safe for asymmetric/pruned trees)
         error_col = loader.error_type.name
-        wt_indices, eval_df = dt.evaluate_all(loader, error_col)
-        error_values = eval_df[error_col].to_numpy()
+        wt_indices, error_values = evaluate_wts_direct(thrL_out, thrH_out, loader, error_col)
+
+        dt = DecisionTree(threshold_low=thrL_out, threshold_high=thrH_out, ranges=ranges)
 
         for idx in range(len(thrL_out)):
             mask = wt_indices == idx
@@ -516,11 +560,9 @@ def save_operation():
         if mode == "all":
             path = path / "Bias.csv"
 
-        # Vectorized: single-pass WT assignment
-        dt = DecisionTree(threshold_low=thrL_out, threshold_high=thrH_out, ranges=ranges)
+        # Direct per-WT evaluation (safe for asymmetric/pruned trees)
         error_col = loader.error_type.name
-        wt_indices, eval_df = dt.evaluate_all(loader, error_col)
-        error_values = eval_df[error_col].to_numpy()
+        wt_indices, error_values = evaluate_wts_direct(thrL_out, thrH_out, loader, error_col)
 
         csv = []
         for idx in range(len(thrL_out)):

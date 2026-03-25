@@ -194,7 +194,7 @@ class SaveOperation extends Component {
 
   getBreakpointsCSV = () => {
     const rows = this.props.breakpoints
-      .map(row => row.map(cell => cell.replace('inf', this.state.inf)).join(','))
+      .map(row => [row[0], ...row.slice(2)].map(cell => String(cell).replace('inf', this.state.inf)).join(','))
       .join('\n')
     return [['WT code', ...this.props.labels], rows].join('\n')
   }
@@ -228,7 +228,7 @@ class SaveOperation extends Component {
         numBins: this.props.numBins, // for mode === "wt"
         yLim: this.props.yLim, // for mode === "wt"
         bins: this.props.bins, // for mode === "wt"
-        thrGridOut: this.props.breakpoints,
+        thrGridOut: this.props.breakpoints.map(row => [row[0], ...row.slice(2)]),
         matrix,
         pdtPath: this.props.path,
         cheaper: this.props.cheaper,
