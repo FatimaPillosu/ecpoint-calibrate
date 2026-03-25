@@ -3,6 +3,7 @@ import { connect } from 'react-redux'
 import Tree from './component'
 
 import { setBreakpoints } from '../breakpoints/actions'
+import { onSaveOperationClicked } from '~/app/header/actions'
 
 const mapStateToProps = state => ({
   breakpoints: state.postprocessing.thrGridOut,
@@ -21,6 +22,8 @@ const mapDispatchToProps = dispatch => ({
   dispatch,
   setBreakpoints: (labels, matrix, fieldRanges) =>
     dispatch(setBreakpoints(labels, matrix, fieldRanges)),
+  setLoading: msg => dispatch({ type: 'POSTPROCESSING.SET_LOADING', data: msg }),
+  onSaveOperationClicked: mode => dispatch(onSaveOperationClicked(mode)),
 })
 
 export default connect(

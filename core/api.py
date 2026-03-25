@@ -458,13 +458,12 @@ def save_operation():
 
     if mode == "all":
         version = payload["version"]
-        family = payload["family"]
+        family = payload.get("family") or payload.get("parameter", "")
         accumulation = payload["accumulation"]
         accumulation = f"{accumulation}h" if accumulation else ""
         dataset_name = payload["datasetName"]
 
-        output_path = output_path / f"{family}{accumulation}{dataset_name}_{version}"
-
+        # outPath already includes the calibration directory name from frontend
         os.makedirs(output_path, exist_ok=True)
 
     if mode in ["breakpoints", "all"]:
@@ -496,7 +495,7 @@ def save_operation():
                 index_label="WT Code",
             )
 
-    if mode in ["wt", "all"]:
+    if mode == "wt":
         ylim = payload["yLim"]
         bins = payload["bins"]
         num_bins = payload["numBins"]
@@ -511,9 +510,6 @@ def save_operation():
         thrL_out, thrH_out = df.iloc[:, ::2], df.iloc[:, 1::2]
 
         path = output_path
-        if mode == "all":
-            path = path / "WTs"
-            os.makedirs(path, exist_ok=True)
 
         # Direct per-WT evaluation (safe for asymmetric/pruned trees)
         error_col = loader.error_type.name
@@ -543,7 +539,7 @@ def save_operation():
                 out_path=os.path.join(path, f"WT_{wt_code}.png"),
             )
 
-    if mode in ["bias", "all"]:
+    if mode == "bias":
         thrGridOut = payload["thrGridOut"]
         bins = payload["bins"]
         num_bins = payload["numBins"]
@@ -557,7 +553,7 @@ def save_operation():
         thrL_out, thrH_out = df.iloc[:, ::2], df.iloc[:, 1::2]
 
         path = output_path
-        if mode == "all":
+        if mode == "bias":
             path = path / "Bias.csv"
 
         # Direct per-WT evaluation (safe for asymmetric/pruned trees)
@@ -578,41 +574,28 @@ def save_operation():
             wt_code = thrGridOut[idx][0]
             csv += [(wt_code, bias)]
 
-        pandas.DataFrame.from_records(csv, columns=["WT Code", "Bias"]).to_csv(
-            path, index=False
-        )
-
-    if mode == "all":
-        family = payload["family"]
-        version = payload["version"]
-
-        accumulation = payload["accumulation"]
-        accumulation = f", {accumulation}-hourly" if accumulation else ""
-
-        with open(output_path / "README.txt", "w") as f:
-            text = dedent(
-                f"""
-                ecPoint-{family}{accumulation}
-                Version: {version}
-                Timestamp: {datetime.now()}
-                """
+        if mode == "bias":
+            pandas.DataFrame.from_records(csv, columns=["WT Code", "Bias"]).to_csv(
+                path, index=False
             )
 
-            f.write(text.lstrip())
+    if mode == "all":
+        parameter = payload.get("parameter", "")
+        dataset_name = payload.get("datasetName", "")
+        version = payload.get("version", "")
+        accumulation = payload.get("accumulation")
+        param_type = payload.get("paramType") or payload.get("parameterType", "accumulated")
 
-        loader = load_point_data_by_path(pdt_path, cheaper=cheaper)
-
-        if pdt_path.endswith(".ascii"):
-            ext = "ascii"
-        elif pdt_path.endswith(".parquet"):
-            ext = "parquet"
+        if param_type == "accumulated" and accumulation:
+            param_line = f"Parameter: {parameter}, {accumulation}h"
         else:
-            ext = "ascii"
+            param_line = f"Parameter: {parameter}"
 
-        exclude_cols = payload["excludePredictors"]
-        cols = [col for col in loader.columns if col not in exclude_cols]
-
-        loader.clone(*cols, path=output_path / f"PDT.{ext}")
+        with open(output_path / "README.txt", "w") as f:
+            f.write(f"ecPoint Post-Processing\n")
+            f.write(f"{param_line}\n")
+            f.write(f"Dataset: {dataset_name}\n")
+            f.write(f"Version: {version}\n")
 
     return Response(json.dumps({}), mimetype="application/json")
 

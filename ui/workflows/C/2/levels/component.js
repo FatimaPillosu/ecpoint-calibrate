@@ -45,10 +45,11 @@ const SortableList = SortableContainer(
           onDelete={() => {
             setFields(items.slice(0, -1))
 
+            const newLabels = labels.slice(0, -2)
+            const numCols = newLabels.length
             const matrix = breakpoints
               .map(row => _.flatMap(row.slice(2)))
-              .map(row => row.slice(0, -2))
-            const newLabels = labels.slice(0, -2)
+              .map(row => row.slice(0, numCols))
 
             const excludePredictor = labels.slice(-2)[0].replace('_thrL', '')
             addExcludedPredictor(excludePredictor)

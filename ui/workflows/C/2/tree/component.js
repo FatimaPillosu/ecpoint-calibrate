@@ -273,6 +273,7 @@ export default class TreeContainer extends Component {
     }
 
     this.setState({ eliminatingWTs: true })
+    this.props.setLoading('Eliminating weather types. Please wait...')
 
     const matrix = this.props.breakpoints.map(row => _.flatMap(row.slice(2)))
 
@@ -289,6 +290,7 @@ export default class TreeContainer extends Component {
         const { matrix: newMatrix, eliminated, remaining, rounds, elapsed_seconds, total_obs_after, total_obs_pdt } = response.data
 
         if (eliminated === 0) {
+          this.props.setLoading(false)
           alert('No WTs have fewer than ' + threshold + ' observations.')
           this.setState({ eliminatingWTs: false })
           return
@@ -301,6 +303,7 @@ export default class TreeContainer extends Component {
         this.props.setBreakpoints(this.props.labels, newMatrix, this.props.fieldRanges)
 
         setTimeout(() => {
+          this.props.setLoading(false)
           this.setState({
             eliminatingWTs: false,
             translate: savedTranslate,
@@ -313,6 +316,7 @@ export default class TreeContainer extends Component {
         }, 200)
       })
       .catch(err => {
+        this.props.setLoading(false)
         this.setState({ eliminatingWTs: false })
         errorHandler(err)
       })
@@ -325,6 +329,8 @@ export default class TreeContainer extends Component {
 
     const values = breakpointsStr.split('/').map(v => v.trim()).filter(v => v !== '')
     if (values.length === 0) return
+
+    this.props.setLoading('Adding weather types to all leaves. Please wait...')
 
     // Parse and sort in descending order (so splits don't shift indices)
     const sortedValues = values.map(parseFloat).sort((a, b) => b - a).map(String)
@@ -362,6 +368,7 @@ export default class TreeContainer extends Component {
     this.props.setBreakpoints(this.props.labels, matrix, this.props.fieldRanges)
 
     setTimeout(() => {
+      this.props.setLoading(false)
       this.setState({
         translate: savedTranslate,
         treeZoom: savedZoom,
@@ -369,6 +376,24 @@ export default class TreeContainer extends Component {
         addWTsBreakpoints: '',
       })
     }, 200)
+  }
+
+  getDeepestLeafLevel = () => {
+    // Find the deepest bounded predictor level across all leaves in the breakpoints
+    if (!this.props.breakpoints || this.props.breakpoints.length === 0 || !this.props.fields) return 0
+    let maxLevel = 0
+    this.props.breakpoints.forEach(row => {
+      const thresholds = row.slice(2) // skip WT code and count
+      for (let i = this.props.fields.length - 1; i >= 0; i--) {
+        const thrL = String(thresholds[i * 2])
+        const thrH = String(thresholds[i * 2 + 1])
+        if (thrL !== '-inf' || thrH !== 'inf') {
+          if (i + 1 > maxLevel) maxLevel = i + 1
+          break
+        }
+      }
+    })
+    return maxLevel
   }
 
   centerRoot = () => {
@@ -1229,151 +1254,90 @@ export default class TreeContainer extends Component {
           minHeight: '40px',
           zIndex: 1,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Button
-              size="tiny"
-              icon
-              labelPosition="left"
-              onClick={this.centerRoot}
-              title="Center and reset view to tree root"
-            >
-              <Icon name="crosshairs" />
-              Center Root
-            </Button>
-            <Button.Group size="tiny">
-              <Button icon="zoom out" onClick={() => this.setState(prev => ({ treeZoom: Math.max(0.1, prev.treeZoom - 0.15) }))} title="Zoom out tree" />
-              <Button content={`${Math.round(this.state.treeZoom * 100)}%`} basic style={{ minWidth: '55px', cursor: 'default' }} />
-              <Button icon="zoom in" onClick={() => this.setState(prev => ({ treeZoom: Math.min(3, prev.treeZoom + 0.15) }))} title="Zoom in tree" />
-            </Button.Group>
-            <Button
-              size="tiny"
-              icon
-              labelPosition="left"
-              toggle
-              active={comparisonMode}
-              onClick={this.toggleComparisonMode}
-              title="Compare two weather types side by side"
-            >
-              <Icon name="columns" />
-              Compare
-            </Button>
-
-            {/* WT Count */}
-            <div style={{
-              background: '#0d9488',
-              color: '#fff',
-              padding: '4px 12px',
-              borderRadius: '12px',
-              fontSize: '12px',
-              fontFamily: "'Poppins', sans-serif",
-              fontWeight: 600,
-              letterSpacing: '0.3px',
-            }}>
-              {this.props.breakpoints ? this.props.breakpoints.length : 0} WTs
-            </div>
-
-            {/* Eliminate small WTs */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '12px', color: '#666', whiteSpace: 'nowrap' }}>Eliminate WTs with &lt;</span>
-              <input
-                type="number"
-                min="1"
-                value={this.state.minObsThreshold}
-                onChange={e => this.setState({ minObsThreshold: e.target.value })}
-                placeholder="500"
-                style={{
-                  width: '70px',
-                  padding: '4px 6px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  fontFamily: "'Work Sans', sans-serif",
-                }}
-              />
-              <span style={{ fontSize: '12px', color: '#666', whiteSpace: 'nowrap' }}>obs</span>
-              <Button
-                size="tiny"
-                icon
-                labelPosition="left"
-                color="red"
-                onClick={this.eliminateSmallWTs}
-                loading={this.state.eliminatingWTs}
-                disabled={this.state.eliminatingWTs || !this.state.minObsThreshold}
-                title="Remove all weather types with fewer observations than the threshold"
-              >
-                <Icon name="trash" />
-                Eliminate
-              </Button>
-            </div>
-
-            {/* Add WTs to all leaves */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Button
-                size="tiny"
-                icon
-                labelPosition="left"
-                style={{ backgroundColor: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif" }}
-                onClick={() => this.setState({ showAddWTs: !this.state.showAddWTs })}
-                title="Add breakpoints to all leaves at a selected predictor level"
-              >
-                <Icon name="plus" />
-                Add WTs
-              </Button>
-            </div>
-
-            {this.state.showAddWTs && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', background: '#f0fdfa', borderRadius: '6px', border: '1px solid #0d948830' }}>
-                <select
-                  value={this.state.addWTsPredictor || ''}
-                  onChange={e => this.setState({ addWTsPredictor: parseInt(e.target.value) })}
-                  style={{
-                    padding: '4px 8px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontFamily: "'Work Sans', sans-serif",
-                  }}
-                >
-                  <option value="" disabled>Select predictor</option>
-                  {this.props.fields && this.props.fields.map((field, idx) => (
-                    <option key={idx} value={idx}>{field}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  placeholder="e.g. 0.25/0.5/0.75"
-                  value={this.state.addWTsBreakpoints || ''}
-                  onChange={e => this.setState({ addWTsBreakpoints: e.target.value })}
-                  style={{
-                    width: '160px',
-                    padding: '4px 6px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontFamily: "'Work Sans', sans-serif",
-                  }}
-                />
-                <Button
-                  size="tiny"
-                  style={{ backgroundColor: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif" }}
-                  onClick={this.addWTsToAllLeaves}
-                  disabled={!this.state.addWTsPredictor && this.state.addWTsPredictor !== 0 || !this.state.addWTsBreakpoints}
-                >
-                  Split All Leaves
+          {/* Two-column layout: left (nav + actions) | right (save) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '16px' }}>
+            {/* LEFT: two rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {/* Left Row 1: Navigation + Compare */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Button size="tiny" icon labelPosition="left" onClick={this.centerRoot} title="Center and reset view to tree root" style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 400 }}>
+                  <Icon name="crosshairs" />
+                  Centre DT to Root
+                </Button>
+                <Button.Group size="tiny">
+                  <Button icon="zoom out" onClick={() => this.setState(prev => ({ treeZoom: Math.max(0.1, prev.treeZoom - 0.15) }))} title="Zoom out tree" />
+                  <Button content={`${Math.round(this.state.treeZoom * 100)}%`} basic style={{ minWidth: '50px', cursor: 'default' }} />
+                  <Button icon="zoom in" onClick={() => this.setState(prev => ({ treeZoom: Math.min(3, prev.treeZoom + 0.15) }))} title="Zoom in tree" />
+                </Button.Group>
+                <span style={{ color: '#ccc', fontSize: '18px', margin: '0 8px' }}>|</span>
+                <div style={{ background: '#e0e1e2', color: '#333', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontFamily: "'Poppins', sans-serif", fontWeight: 600, letterSpacing: '0.3px' }}>
+                  Current {this.props.breakpoints ? this.props.breakpoints.length : 0} WTs
+                </div>
+                <Button size="tiny" icon labelPosition="left"
+                  style={comparisonMode ? { backgroundColor: '#444', color: '#fff', fontFamily: "'Work Sans', sans-serif", fontWeight: 400 } : { fontFamily: "'Work Sans', sans-serif", fontWeight: 400 }}
+                  onClick={this.toggleComparisonMode} title="Compare two weather types side by side">
+                  <Icon name="columns" />
+                  Compare WTs
                 </Button>
               </div>
-            )}
+              {/* Left Row 2: Eliminate + Add WTs */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                  <span style={{ fontSize: '11px', color: '#991b1b', whiteSpace: 'nowrap', fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>Eliminate WTs with &lt;</span>
+                  <input type="number" min="1" value={this.state.minObsThreshold} onChange={e => this.setState({ minObsThreshold: e.target.value })} placeholder="1000"
+                    style={{ width: '60px', padding: '3px 5px', border: '1px solid #fecaca', borderRadius: '4px', fontSize: '11px', fontFamily: "'Work Sans', sans-serif", background: '#fff' }} />
+                  <span style={{ fontSize: '11px', color: '#991b1b', whiteSpace: 'nowrap', fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>data points</span>
+                  <Button size="mini" icon color="red" onClick={this.eliminateSmallWTs} loading={this.state.eliminatingWTs} disabled={this.state.eliminatingWTs || !this.state.minObsThreshold}
+                    title="Remove all weather types with fewer observations than the threshold">
+                    <Icon name="trash" />
+                  </Button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: '#f0fdfa', borderRadius: '6px', border: '1px solid #99f6e4' }}>
+                  <span style={{ fontSize: '11px', color: '#065f46', whiteSpace: 'nowrap', fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>Add WTs to all leaves</span>
+                  <select value={this.state.addWTsPredictor || ''} onChange={e => this.setState({ addWTsPredictor: parseInt(e.target.value) })}
+                    style={{ padding: '3px 6px', border: '1px solid #99f6e4', borderRadius: '4px', fontSize: '11px', fontFamily: "'Work Sans', sans-serif", background: '#fff' }}>
+                    <option value="" disabled>Select predictor</option>
+                    {this.props.fields && (() => {
+                      const deepest = this.getDeepestLeafLevel()
+                      return this.props.fields.slice(deepest).map((field, idx) => (
+                        <option key={deepest + idx} value={deepest + idx}>{field}</option>
+                      ))
+                    })()}
+                  </select>
+                  <input type="text" placeholder="e.g. 0.25/0.5/0.75" value={this.state.addWTsBreakpoints || ''} onChange={e => this.setState({ addWTsBreakpoints: e.target.value })}
+                    style={{ width: '120px', padding: '3px 5px', border: '1px solid #99f6e4', borderRadius: '4px', fontSize: '11px', fontFamily: "'Work Sans', sans-serif", background: '#fff' }} />
+                  <Button size="mini" icon style={{ backgroundColor: '#0d9488', color: '#fff' }} onClick={this.addWTsToAllLeaves}
+                    disabled={!this.state.addWTsPredictor && this.state.addWTsPredictor !== 0 || !this.state.addWTsBreakpoints} title="Split all leaves at this predictor level">
+                    <Icon name="plus" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT: Save Calibration Files */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+              <span style={{ fontSize: '12px', color: '#333', fontFamily: "'Poppins', sans-serif", fontWeight: 500 }}>Save Calibration Files</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Button size="mini" compact style={{ fontSize: '11px', fontFamily: "'Work Sans', sans-serif", fontWeight: 400, padding: '5px 8px', whiteSpace: 'nowrap' }}
+                  onClick={() => this.props.onSaveOperationClicked('breakpoints')}>Break-Points for all WTs (CSV)</Button>
+                <Button size="mini" compact style={{ fontSize: '11px', fontFamily: "'Work Sans', sans-serif", fontWeight: 400, padding: '5px 8px', whiteSpace: 'nowrap' }}
+                  onClick={() => this.props.onSaveOperationClicked('mf')}>FERs for all WTs (CSV)</Button>
+                <Button size="mini" compact style={{ fontSize: '11px', fontFamily: "'Work Sans', sans-serif", fontWeight: 400, padding: '5px 8px', whiteSpace: 'nowrap' }}
+                  onClick={() => this.props.onSaveOperationClicked('wt')}>MFs per WT (PNGs)</Button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Button size="mini" compact style={{ fontSize: '11px', fontFamily: "'Work Sans', sans-serif", fontWeight: 400, padding: '5px 8px', whiteSpace: 'nowrap' }}
+                  onClick={() => this.props.onSaveOperationClicked('bias')}>Biases for all WTs (CSV)</Button>
+                <Button size="mini" compact style={{ fontSize: '11px', fontFamily: "'Work Sans', sans-serif", fontWeight: 400, padding: '5px 8px', whiteSpace: 'nowrap' }}
+                  onClick={() => {
+                    const node = this.treeContainer.getElementsByTagName('svg')[0]
+                    saveSvgAsPng(node, 'decision-tree.png', { backgroundColor: '#ffffff' })
+                  }}>DT - Current View (PNG)</Button>
+                <Button size="mini" compact style={{ fontSize: '11px', backgroundColor: '#444', color: '#fff', fontFamily: "'Work Sans', sans-serif", fontWeight: 400, padding: '5px 8px', whiteSpace: 'nowrap' }}
+                  onClick={() => this.props.onSaveOperationClicked('all')}>Operational Bundle</Button>
+              </div>
+            </div>
           </div>
-          <Button
-            content="Save tree as PNG"
-            icon="download"
-            labelPosition="left"
-            size="tiny"
-            onClick={() => {
-              const node = this.treeContainer.getElementsByTagName('svg')[0]
-              saveSvgAsPng(node, 'decision-tree.png', { backgroundColor: '#ffffff' })
-            }}
-          />
         </div>
 
         {/* Main split layout */}

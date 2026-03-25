@@ -38,6 +38,7 @@ import FileBrowser from '~/components/FileBrowser'
 
 const defaultState = {
   customSplitValues: [],
+  customSplitRaw: '',
   customSplitLevel: '',
   auto: false,
   numBreakpoints: '',
@@ -192,6 +193,7 @@ class Split extends Component {
     this.state.definitiveBreakpoints.length > 0 && (
       <Button
         content="Save suggested MFs"
+        style={{ backgroundColor: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif", fontWeight: 400 }}
         onClick={() => this.setState({ fileBrowserOpen: true })}
       />
     )
@@ -322,15 +324,17 @@ class Split extends Component {
                 <Input
                   disabled={this.state.auto}
                   error={this.numberArrayHasError(this.state.customSplitValues)}
-                  value={this.state.customSplitValues.join('/')}
-                  onChange={e =>
+                  value={this.state.customSplitRaw || this.state.customSplitValues.join('/')}
+                  onChange={e => {
+                    const raw = e.target.value
                     this.setState({
-                      customSplitValues: e.target.value
+                      customSplitRaw: raw,
+                      customSplitValues: raw
                         .split('/')
                         .map(v => v.trim())
                         .filter(v => v !== ''),
                     })
-                  }
+                  }}
                   label={
                     <Dropdown
                       scrolling
@@ -407,7 +411,7 @@ class Split extends Component {
           <Grid.Row verticalAlign="middle">
             <Divider vertical>=&gt;</Divider>
             <Grid.Column>
-              <p align="left">Select one of the BPi suggested by the K-S test:</p>
+              <p align="left" style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '14px', color: '#333' }}>Select one of the BPi suggested by the K-S test:</p>
 
               <Table celled compact definition>
                 <Table.Header fullWidth>
@@ -472,10 +476,10 @@ class Split extends Component {
                 </Grid.Row>
                 <Grid.Row>
                   <Grid columns={3} stackable textAlign="center">
-                    <h4>Re-run the K-S test from scratch</h4>
+                    <h4 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, color: '#333' }}>Re-run the K-S test from scratch</h4>
                     <Grid.Row>
                       <Grid.Column>
-                        <Header as="h4" icon>
+                        <Header as="h4" icon style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, color: '#333' }}>
                           Consider variable
                         </Header>
                         <br />
@@ -491,7 +495,7 @@ class Split extends Component {
                         />
                       </Grid.Column>
                       <Grid.Column>
-                        <Header as="h4" icon>
+                        <Header as="h4" icon style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, color: '#333' }}>
                           No. of BPs
                         </Header>
                         <br />
@@ -572,7 +576,7 @@ class Split extends Component {
               <Grid.Column>
                 <Grid.Row>
                   <Container textAlign="left">
-                    <h4>Definitive breakpoints:</h4>
+                    <h4 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, color: '#333' }}>Definitive breakpoints:</h4>
                   </Container>
                   {this.renderDefintiveBreakpoints(this.state.definitiveBreakpoints)}
                 </Grid.Row>
@@ -630,7 +634,7 @@ class Split extends Component {
                       {
                         <Button
                           content="Run K-S test"
-                          positive
+                          style={{ backgroundColor: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif", fontWeight: 400 }}
                           disabled={
                             !this.state.definitiveBreakpointRange ||
                             !this.state.numBreakpointsDefinitive ||
@@ -671,7 +675,7 @@ class Split extends Component {
   getSplitButton = () => (
     <Button
       fluid
-      color="green"
+      style={{ backgroundColor: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif", fontWeight: 400 }}
       content="Split"
       disabled={
         this.state.auto
@@ -693,7 +697,7 @@ class Split extends Component {
     <Button
       fluid={fluid}
       content="Run K-S test"
-      positive
+      style={{ backgroundColor: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif", fontWeight: 400 }}
       disabled={
         !this.state.auto ||
         !this.state.numBreakpoints ||
@@ -716,8 +720,8 @@ class Split extends Component {
             this.props.onClose()
           }}
         >
-          <Modal.Header>{this.getTitle()}</Modal.Header>
-          <Modal.Content>
+          <Modal.Header style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '18px', color: '#333' }}>{this.getTitle()}</Modal.Header>
+          <Modal.Content style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, color: '#333' }}>
             {this.getSwitcher()}
             {this.isKSTestMode() && this.getPrimaryStats()}
             {this.isKSTestMode() && this.getSecondaryStats()}

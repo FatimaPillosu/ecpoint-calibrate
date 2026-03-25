@@ -20,24 +20,39 @@ class PostProcessing extends Component {
         : true
       : true
 
-  getYLimitField = () =>
+  getWTsLayoutFields = () =>
     this.props.thrGridOut.length > 0 && (
       <Item>
         <Item.Content>
-          <Item.Header>
-            <h5>Enter maximum value of Y-axis in the histograms:</h5>
-          </Item.Header>
-          <Item.Description>
-            <Input
-              value={this.props.yLim || ''}
-              error={this.yLimHasError()}
-              onChange={e => this.props.onYLimChange(e.target.value)}
-            />
-          </Item.Description>
-          <Item.Extra>
-            Valid values are all floating-point numbers in the set <code>(0, 100]</code>
-            .
-          </Item.Extra>
+          <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '15px', color: '#333', marginBottom: '14px' }}>
+            WTs Layout
+          </div>
+          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+            <div>
+              <Input
+                label="Max WTs Y-axis value"
+                placeholder="e.g. 100"
+                value={this.props.yLim || ''}
+                error={this.yLimHasError()}
+                onChange={e => this.props.onYLimChange(e.target.value)}
+                style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}
+                input={{ style: { fontFamily: "'Work Sans', sans-serif", fontWeight: 300 } }}
+              />
+              <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Valid values: integers between (0, 100]</p>
+            </div>
+            <div>
+              <Input
+                label="N. of bins for biases and FER"
+                placeholder="e.g. 100"
+                value={this.props.numBins || ''}
+                error={this.numBinsHasError()}
+                onChange={e => this.props.onNumBinsChange(e.target.value)}
+                style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}
+                input={{ style: { fontFamily: "'Work Sans', sans-serif", fontWeight: 300 } }}
+              />
+              <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Valid values: positive integers</p>
+            </div>
+          </div>
         </Item.Content>
       </Item>
     )
@@ -45,25 +60,6 @@ class PostProcessing extends Component {
   numBinsHasError = () =>
     this.props.numBins === '' ||
     (/^\d+$/.test(this.props.numBins) && parseInt(this.props.numBins) > 0 ? null : true)
-
-  getNumBinsField = () =>
-    this.props.thrGridOut.length > 0 && (
-      <Item>
-        <Item.Content>
-          <Item.Header>
-            <h5>Enter the number of bins to use for bias computation:</h5>
-          </Item.Header>
-          <Item.Description>
-            <Input
-              value={this.props.numBins || ''}
-              error={this.numBinsHasError()}
-              onChange={e => this.props.onNumBinsChange(e.target.value)}
-            />
-          </Item.Description>
-          <Item.Extra>Only positive integers are considered valid values.</Item.Extra>
-        </Item.Content>
-      </Item>
-    )
 
   getDecisionTree = () => (
     <Item>
@@ -129,7 +125,7 @@ class PostProcessing extends Component {
 
             <Card fluid color="black" style={{ marginTop: '20px' }}>
               <Card.Header>
-                <Grid.Column floated="left">Temp</Grid.Column>
+                <Grid.Column floated="left">Visual Decision Tree</Grid.Column>
               </Card.Header>
               <Card.Content>
                 <Card.Description>
@@ -137,8 +133,7 @@ class PostProcessing extends Component {
                     {/* Hide tree until loading is finished for better experience */}
                     {!this.props.loading && (
                       <>
-                        {this.getYLimitField()}
-                        {this.getNumBinsField()}
+                        {this.getWTsLayoutFields()}
                         {this.getDecisionTree()}
                         {this.getSaveOperation()}
                       </>

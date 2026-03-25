@@ -10,11 +10,13 @@ import FileBrowser from '~/components/FileBrowser'
 import { readFileContent } from '~/utils/fileBrowser'
 
 const defaultState = {
-  datasetName: null,
-  family: null,
-  version: null,
+  parameter: null,
+  paramType: null, // 'accumulated' or 'instantaneous'
   accumulation: null,
-  inf: 'inf',
+  datasetName: null,
+  version: null,
+  inf: '',
+  uploadInf: '',
   mfcols: null,
   outPath: null,
   fileBrowserOpen: false,
@@ -30,25 +32,27 @@ const SecondaryText = ({ text, divider }) => (
 class SaveOperation extends Component {
   state = defaultState
 
+
   isEmpty = () => {
     if (this.props.mode === 'mf') {
-      return !this.state.mfcols || !this.state.outPath
+      return !this.props.numBins || !this.state.outPath
     } else if (this.props.mode === 'wt') {
       return !this.state.outPath
     } else if (this.props.mode === 'bias') {
       return !this.state.outPath
-    } else if (
-      this.props.mode === 'breakpoints' ||
-      this.props.mode === 'breakpoints-upload'
-    ) {
+    } else if (this.props.mode === 'breakpoints') {
       return !this.state.inf || !this.state.outPath
+    } else if (this.props.mode === 'breakpoints-upload') {
+      return !this.state.uploadInf || !this.state.outPath
     } else {
       return (
-        !this.state.family ||
+        !this.state.parameter ||
+        !this.state.paramType ||
+        (this.state.paramType === 'accumulated' && !this.state.accumulation) ||
         !this.state.datasetName ||
         !this.state.version ||
         !this.state.inf ||
-        !this.state.mfcols ||
+        !this.props.numBins ||
         !this.state.outPath
       )
     }
@@ -61,60 +65,86 @@ class SaveOperation extends Component {
 
   getMetadataComponent = () => (
     <Segment padded style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>
-      <h5 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '14px', color: '#333' }}>Enter operation metadata:</h5>
+      <h5 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '14px', color: '#333', marginBottom: '2px' }}>Operational Files Metadata</h5>
+      <p style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '12px', color: '#666', marginTop: 0, marginBottom: '12px' }}>* Mandatory fields</p>
 
+      {/* 1. Post-Processed Parameter + Accumulated/Instantaneous */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px', flexWrap: 'wrap' }}>
+        <Input
+          label="Post-Processed Parameter*"
+          placeholder="e.g. Rainfall"
+          value={this.state.parameter || ''}
+          onChange={e => this.setState({ parameter: e.target.value })}
+          style={{ fontFamily: "'Work Sans', sans-serif" }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '13px' }}>
+            <input
+              type="radio"
+              name="paramType"
+              checked={this.state.paramType === 'accumulated'}
+              onChange={() => this.setState({ paramType: 'accumulated' })}
+              style={{ accentColor: '#0d9488' }}
+            />
+            Accumulated Parameter
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '13px' }}>
+            <input
+              type="radio"
+              name="paramType"
+              checked={this.state.paramType === 'instantaneous'}
+              onChange={() => this.setState({ paramType: 'instantaneous', accumulation: null })}
+              style={{ accentColor: '#0d9488' }}
+            />
+            Instantaneous Parameter
+          </label>
+        </div>
+        {this.state.paramType === 'accumulated' && (
+          <Input
+            label="Accumulation (in hours)"
+            placeholder="e.g. 24"
+            value={this.state.accumulation || ''}
+            onChange={e => this.setState({ accumulation: e.target.value })}
+            style={{ fontFamily: "'Work Sans', sans-serif" }}
+          />
+        )}
+      </div>
+      <Divider />
+
+      {/* 2. Post-Processed Dataset Name */}
       <Input
-        label="Dataset Name*"
-        value={this.state.datasetName}
+        label="Post-Processed Dataset Name*"
+        placeholder="e.g. ENS"
+        value={this.state.datasetName || ''}
         onChange={e => this.setState({ datasetName: e.target.value })}
+        style={{ fontFamily: "'Work Sans', sans-serif" }}
       />
-      <SecondaryText text="Name of the post-processed dataset" divider />
+      <Divider />
 
+      {/* 3. Calibration Version */}
       <Input
-        label="Family*"
-        placeholder="rainfall"
-        value={this.state.family}
-        onChange={e => this.setState({ family: e.target.value })}
-      />
-      <SecondaryText text="ecPoint family, e.g. Rainfall, Temperature" divider />
-
-      <Input
-        label="Version*"
+        label="Calibration Version*"
+        placeholder="e.g. 1.0.0"
         error={this.state.version && semver.valid(this.state.version) === null}
-        value={this.state.version}
+        value={this.state.version || ''}
         onChange={e => this.setState({ version: e.target.value })}
+        style={{ fontFamily: "'Work Sans', sans-serif" }}
       />
-      <SecondaryText text="Calibration version (in SemVer 2.0.0 format)" divider />
-
-      <Input
-        label="Accumulation (in hours)"
-        value={this.state.accumulation}
-        onChange={e => this.setState({ accumulation: e.target.value })}
-      />
-      <SecondaryText
-        text="Accumulation period for the post-processed variable, e.g. Rainfall"
-        divider
-      />
-
-      <p style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#666' }}>Fields marked with * are mandatory.</p>
+      <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+        In <a href="https://semver.org/" target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488' }}>SemVer 2.0.0</a> format
+      </p>
     </Segment>
   )
 
   getBreakpointsCSVComponent = () => (
     <Segment padded style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>
       <h5 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '14px', color: '#333' }}>
-        {this.props.mode === 'breakpoints'
-          ? 'Enter parameters for saving breakpoints in Weather Types as CSV:'
-          : null}
+        Representation of "inf" values in CSV tables
       </h5>
-      {this.props.mode !== 'breakpoints' && (
-        <p style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', marginBottom: '10px' }}>
-          Insert the numerical value or string representing the "Infinity" value in the CSV table:
-        </p>
-      )}
 
       <Input
-        label="Infinity value"
+        label='Numerical value representing "inf"'
+        placeholder="e.g. 9999"
         value={this.state.inf}
         onChange={e => this.setState({ inf: e.target.value })}
         style={{ fontFamily: "'Work Sans', sans-serif" }}
@@ -122,18 +152,23 @@ class SaveOperation extends Component {
     </Segment>
   )
 
-  getMFsCSVComponent = () => (
+  getUploadInfComponent = () => (
     <Segment padded style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>
-      <h5 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '14px', color: '#333' }}>Enter parameters for saving Mapping Functions as CSV:</h5>
+      <h5 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '14px', color: '#333' }}>
+        Numerical value or string representing "inf"
+      </h5>
 
       <Input
-        label="No. of post-processed members*"
-        value={this.state.mfcols}
-        onChange={e => this.setState({ mfcols: e.target.value })}
+        label='Value representing "inf"'
+        placeholder='e.g. 9999 or "inf"'
+        value={this.state.uploadInf}
+        onChange={e => this.setState({ uploadInf: e.target.value })}
+        style={{ fontFamily: "'Work Sans', sans-serif" }}
       />
-      <SecondaryText text="Number of post-processed members to create for each raw member" />
     </Segment>
   )
+
+  // MFs CSV component removed — numBins from WTs Layout is used directly
 
   getFileBrowserMode = () => {
     if (this.props.mode === 'all' || this.props.mode === 'wt') {
@@ -155,26 +190,49 @@ class SaveOperation extends Component {
     return null
   }
 
-  getOutputPathComponent = () => (
-    <Segment padded style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>
-      <p style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', marginBottom: '10px' }}>Select path:</p>
-      <Button
-        as="div"
-        labelPosition="right"
-        onClick={() => this.setState({ fileBrowserOpen: true })}
-      >
-        <Button icon style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 400 }}>
-          <Icon name="save" />
-          Browse
+  getCalibrationDirName = () => {
+    const { parameter, paramType, accumulation, datasetName, version } = this.state
+    if (!parameter || !datasetName || !version) return null
+    const parts = [parameter]
+    if (paramType === 'accumulated' && accumulation) {
+      parts.push(`${accumulation}h`)
+    }
+    parts.push(datasetName, version)
+    return parts.join('_')
+  }
+
+  getOutputPathComponent = () => {
+    const dirName = this.props.mode === 'all' ? this.getCalibrationDirName() : null
+    const displayPath = this.state.outPath
+      ? (dirName ? `${this.state.outPath}/${dirName}` : this.state.outPath)
+      : null
+
+    return (
+      <Segment padded style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300 }}>
+        <h5 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '14px', color: '#333', marginBottom: '10px' }}>Select Path</h5>
+        <Button
+          as="div"
+          labelPosition="right"
+          onClick={() => this.setState({ fileBrowserOpen: true })}
+        >
+          <Button icon style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 400 }}>
+            <Icon name="save" />
+            Browse
+          </Button>
+          {displayPath !== null && (
+            <Label basic pointing="left">
+              {displayPath}
+            </Label>
+          )}
         </Button>
-        {this.state.outPath !== null && (
-          <Label basic pointing="left">
-            {this.state.outPath}
-          </Label>
+        {dirName && this.state.outPath && (
+          <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+            Output directory: <strong>{dirName}</strong>
+          </p>
         )}
-      </Button>
-    </Segment>
-  )
+      </Segment>
+    )
+  }
 
   getHeader = () => {
     if (this.props.mode === 'mf') {
@@ -201,17 +259,28 @@ class SaveOperation extends Component {
 
   setBreakpointsCSV = async () => {
     try {
+      this.close()
       const { content: csv } = await readFileContent(this.state.outPath)
-      const data = csv.split('\n').map(row => row.split(','))
+      const data = csv.split('\n').filter(row => row.trim() !== '').map(row => row.split(','))
+      const wtCount = data.length - 1
+      this.props.setLoading(`Uploading a DT with ${wtCount} WTs. Please wait...`)
       const matrix = data
         .slice(1)
         .map(row => row.slice(1))
-        .map(row => row.map(cell => cell.replace(this.state.inf, 'inf')))
+        .map(row => row.map(cell => {
+          const val = cell.trim()
+          const rep = this.state.uploadInf ? this.state.uploadInf.trim() : ''
+          // Skip replace if uploadInf is empty or already "inf"
+          if (!rep || rep.toLowerCase() === 'inf' || rep.toLowerCase() === '-inf') return val
+          // Replace positive infinity
+          if (val === rep) return 'inf'
+          // Replace negative infinity (e.g. -9999 → -inf)
+          if (val === '-' + rep) return '-inf'
+          return val
+        }))
 
-      this.props.setLoading('Generating and rendering decision tree.')
-      this.props.setBreakpoints(this.props.labels, matrix, this.props.fieldRanges)
+      await this.props.setBreakpoints(this.props.labels, matrix, this.props.fieldRanges)
       this.props.setLoading(false)
-      this.close()
     } catch (e) {
       console.error('Failed to read breakpoints CSV:', e)
       this.props.setLoading(false)
@@ -219,7 +288,8 @@ class SaveOperation extends Component {
   }
 
   save = () => {
-    this.props.setLoading('Saving...')
+    this.props.setLoading('Saving calibration files. Please wait...')
+    this.close()
     const matrix = this.props.breakpoints.map(row => _.flatMap(row.slice(2)))
 
     client
@@ -240,14 +310,18 @@ class SaveOperation extends Component {
             ? this.getBreakpointsCSV()
             : null,
         ...this.state,
+        outPath: this.props.mode === 'all' && this.getCalibrationDirName()
+          ? `${this.state.outPath}/${this.getCalibrationDirName()}`
+          : this.state.outPath,
+        mfcols: this.props.numBins,
       })
       .then(response => {
-        toast.success('Successfully saved operation files')
-      })
-      .catch(errorHandler)
-      .finally(() => {
         this.props.setLoading(false)
-        this.close()
+        toast.success('Successfully saved calibration files')
+      })
+      .catch(err => {
+        this.props.setLoading(false)
+        errorHandler(err)
       })
   }
 
@@ -260,11 +334,10 @@ class SaveOperation extends Component {
             <Modal.Content style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, color: '#333' }}>
               {this.props.mode === 'all' && this.getMetadataComponent()}
               {(this.props.mode === 'all' ||
-                this.props.mode === 'breakpoints' ||
-                this.props.mode === 'breakpoints-upload') &&
+                this.props.mode === 'breakpoints') &&
                 this.getBreakpointsCSVComponent()}
-              {(this.props.mode === 'all' || this.props.mode === 'mf') &&
-                this.getMFsCSVComponent()}
+              {this.props.mode === 'breakpoints-upload' && this.getUploadInfComponent()}
+              {/* MFs CSV section removed — numBins from WTs Layout is used directly */}
               {this.getOutputPathComponent()}
             </Modal.Content>
             <Modal.Actions>
