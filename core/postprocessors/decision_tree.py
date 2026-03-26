@@ -486,16 +486,48 @@ class DecisionTree(object):
         return wt_indices, df
 
     def cal_rep_error(self, loader: BasePointDataReader, nBin) -> pd.DataFrame:
-        error_col = loader.error_type.name
-        wt_indices, df = self.evaluate_all(loader, error_col)
+        """Compute representative (discretized) error values per WT.
 
-        error_values = df[error_col].to_numpy()
+        Uses direct per-WT threshold evaluation — safe for asymmetric,
+        pruned, and merged decision trees.
+        """
+        error_col = loader.error_type.name
+
+        # Build threshold DataFrames with proper column names
+        pred_names_low = [f"{p}_thrL" for p in self.predictors]
+        pred_names_high = [f"{p}_thrH" for p in self.predictors]
+        thrL_out = self.threshold_low.copy()
+        thrH_out = self.threshold_high.copy()
+        thrL_out.columns = pred_names_low
+        thrH_out.columns = pred_names_high
+
+        # Pre-load predictor and error arrays
+        pred_arrays = []
+        for col_name in self.predictors:
+            if col_name in loader.dataframe.columns:
+                pred_arrays.append(loader.dataframe[col_name].to_numpy(dtype=np.float64))
+            else:
+                pred_arrays.append(None)
+
+        error_values = loader.dataframe[error_col].to_numpy()
+        n_obs = len(error_values)
         rep_error = np.full((self.num_wt, nBin), -1.0)
 
+        # Evaluate each WT directly using its threshold conditions
         for wt_idx in range(self.num_wt):
-            mask = wt_indices == wt_idx
-            if mask.any():
-                wt_error = pd.Series(error_values[mask])
+            mask = np.ones(n_obs, dtype=bool)
+            for p_idx in range(len(self.predictors)):
+                if pred_arrays[p_idx] is None:
+                    continue
+                lo = float(thrL_out.iloc[wt_idx, p_idx])
+                hi = float(thrH_out.iloc[wt_idx, p_idx])
+                if np.isneginf(lo) and np.isposinf(hi):
+                    continue  # unbounded — skip check
+                vals = pred_arrays[p_idx]
+                mask &= (vals >= lo) & (vals < hi)
+
+            wt_error = pd.Series(error_values[mask])
+            if len(wt_error) > 0:
                 rep_error[wt_idx] = WeatherType.discretize_error(
                     wt_error, num_bins=nBin
                 )
@@ -647,12 +679,21 @@ class WeatherType(object):
             elif up >= len(error):
                 up = len(error) - 1
                 low = up - 1
+                # Clamp val so weights stay non-negative
+                val = min(val, up)
 
             low_val = error[low]
             up_val = error[up]
             w_low, w_up = 1 - abs(val - low), 1 - abs(val - up)
 
-            rep_error[k] = ((low_val * w_low) + (up_val * w_up)) / (w_low + w_up)
+            # Safety: ensure non-negative weights
+            w_low = max(w_low, 0)
+            w_up = max(w_up, 0)
+            denom = w_low + w_up
+            if denom == 0:
+                rep_error[k] = error[up]
+            else:
+                rep_error[k] = ((low_val * w_low) + (up_val * w_up)) / denom
 
         return pd.Series(rep_error)
 
