@@ -537,6 +537,46 @@ table.data-grid {
   padding: 0 10px !important;
 }
 
+/* ==============================
+   DATE PICKER ON-BRAND OVERRIDES
+   ============================== */
+
+.react-datepicker__day--selected,
+.react-datepicker__day--in-selecting-range,
+.react-datepicker__day--in-range,
+.react-datepicker__day--keyboard-selected {
+  background-color: #0d9488 !important;
+  color: #fff !important;
+  border-radius: 4px !important;
+}
+
+.react-datepicker__day--selected:hover,
+.react-datepicker__day--in-selecting-range:hover,
+.react-datepicker__day--in-range:hover {
+  background-color: #0f766e !important;
+}
+
+.react-datepicker__day:hover {
+  background-color: #f0fdfa !important;
+  border-radius: 4px !important;
+}
+
+.react-datepicker__header {
+  background-color: #faf8f5 !important;
+  border-bottom: 1px solid #e5e5e5 !important;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  font-family: 'Poppins', sans-serif !important;
+  color: #333 !important;
+}
+
+.react-datepicker__day {
+  font-family: 'Work Sans', sans-serif !important;
+  color: #333 !important;
+}
+
 /*
  * Trick to make sure the fullscreen modal has equal and correct spacing
  * on both sides of the modal.

@@ -21,11 +21,11 @@ class Predictand extends Component {
     <Item>
       <Item.Content>
         <Item.Header>
-          <h5>Select the directory that contains the predictand:</h5>
+          <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>Select the directory that contains the predictand:</h5>
         </Item.Header>
 
         <Item.Description>
-          <Button onClick={() => this.setState({ fileBrowserOpen: true })}>
+          <Button style={{ backgroundColor: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif" }} onClick={() => this.setState({ fileBrowserOpen: true })}>
             Browse
           </Button>
         </Item.Description>
@@ -61,7 +61,7 @@ class Predictand extends Component {
     <Item>
       <Item.Content>
         <Item.Header>
-          <h5>Enter an accumulation period, in hours, for the predictand:</h5>
+          <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>Enter an accumulation period, in hours, for the predictand:</h5>
         </Item.Header>
         <Item.Extra>
           For example, insert the value <code>24</code> for a 24-hour accumulation
@@ -88,7 +88,7 @@ class Predictand extends Component {
     <Item>
       <Item.Content>
         <Item.Header>
-          <h5>Enter a minimum value for the predictand to prevent dividing by zero:</h5>
+          <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>Enter a minimum value for the predictand to prevent dividing by zero:</h5>
         </Item.Header>
         <Item.Extra>
           For example, enter the value <code>1</code> for <code>1 mm</code> over the
@@ -123,7 +123,7 @@ class Predictand extends Component {
     <Item>
       <Item.Content>
         <Item.Header>
-          <h5>Select the type of predictand:</h5>
+          <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>Select the type of predictand:</h5>
         </Item.Header>
 
         <Item.Description>
@@ -201,7 +201,7 @@ class Predictand extends Component {
         <Grid container centered>
           <Grid.Column>
             <Card fluid color="black">
-              <Card.Header>
+              <Card.Header style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: '18px' }}>
                 <Grid.Column floated="left">Model data — Predictand</Grid.Column>
                 <Grid.Column floated="right">
                   {this.isComplete() && <Icon name="check circle" />}

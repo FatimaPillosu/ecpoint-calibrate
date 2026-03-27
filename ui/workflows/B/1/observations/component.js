@@ -12,11 +12,11 @@ class Observation extends Component {
     <Item>
       <Item.Content>
         <Item.Header>
-          <h5>Select the directory that contains the observations:</h5>
+          <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>Select the directory that contains the observations:</h5>
         </Item.Header>
 
         <Item.Description>
-          <Button onClick={() => this.setState({ fileBrowserOpen: true })}>
+          <Button style={{ backgroundColor: '#0d9488', color: '#fff', fontFamily: "'Work Sans', sans-serif" }} onClick={() => this.setState({ fileBrowserOpen: true })}>
             Browse
           </Button>
         </Item.Description>
@@ -35,7 +35,7 @@ class Observation extends Component {
     <Item>
       <Item.Content>
         <Item.Header>
-          <h5>Enter the units in which the observations are stored:</h5>
+          <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>Enter the units in which the observations are stored:</h5>
         </Item.Header>
 
         <Item.Description>
@@ -61,7 +61,7 @@ class Observation extends Component {
       <Grid container centered>
         <Grid.Column>
           <Card fluid color="black">
-            <Card.Header>
+            <Card.Header style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: '18px' }}>
               <Grid.Column floated="left">
                 Observational Data — Select observations
               </Grid.Column>

@@ -103,82 +103,13 @@ export default class Header extends Component {
                 </Dropdown.Menu>
               </Dropdown>
             ) : (
-              <Dropdown item trigger={<Icon name="bars" size="large" style={{ margin: 0 }} />}>
-                <Dropdown.Menu>
-                  {this.props.workflow === 'B' && (
-                    <MenuFragment title="Import">
-                      <Dropdown.Item
-                        disabled={this.props.page.activePageNumber === 3}
-                        onClick={() =>
-                          this.openFileBrowser('openFile', 'importWorkflow', '*.json')
-                        }
-                      >
-                        Workflow
-                      </Dropdown.Item>
-                    </MenuFragment>
-                  )}
-
-                  {['B', 'C'].includes(this.props.workflow) && (
-                    <MenuFragment title="Export">
-                      {this.props.workflow === 'C' && (
-                        <>
-                          <Dropdown.Item
-                            disabled={this.props.page.activePageNumber !== 2}
-                            onClick={() => this.props.onSaveOperationClicked('breakpoints')}
-                          >
-                            Breakpoints (CSV)
-                          </Dropdown.Item>
-                          <Dropdown.Item
-                            disabled={this.props.page.activePageNumber !== 2}
-                            onClick={() => this.props.onSaveOperationClicked('mf')}
-                          >
-                            Mapping Functions (CSV)
-                          </Dropdown.Item>
-                          <Dropdown.Item
-                            disabled={this.props.page.activePageNumber !== 2}
-                            onClick={() => this.props.onSaveOperationClicked('wt')}
-                          >
-                            Weather Types (PNG)
-                          </Dropdown.Item>
-                          <Dropdown.Item
-                            disabled={this.props.page.activePageNumber !== 2}
-                            onClick={() => this.props.onSaveOperationClicked('bias')}
-                          >
-                            Weather Type biases
-                          </Dropdown.Item>
-                          <Dropdown.Item
-                            disabled={this.props.page.activePageNumber !== 2}
-                            onClick={() => this.props.onSaveOperationClicked('all')}
-                          >
-                            Operational calibration files
-                          </Dropdown.Item>
-                        </>
-                      )}
-                      {this.props.workflow === 'B' && (
-                        <Dropdown.Item
-                          disabled={this.props.page.activePageNumber !== 3}
-                          onClick={() =>
-                            this.openFileBrowser(
-                              'saveFile',
-                              'exportWorkflow',
-                              '*.json',
-                              'workflow.json'
-                            )
-                          }
-                        >
-                          Workflow
-                        </Dropdown.Item>
-                      )}
-                    </MenuFragment>
-                  )}
-
-                  <MenuFragment title="Navigation" divider={false}>
-                    <Dropdown.Item onClick={() => this.props.resetApp()}>
-                      Home
-                    </Dropdown.Item>
-                  </MenuFragment>
-                </Dropdown.Menu>
-              </Dropdown>
+              <Menu.Item
+                onClick={() => this.props.resetApp()}
+                style={{ cursor: 'pointer' }}
+                title="Go to Home"
+              >
+                <Icon name="home" size="large" style={{ margin: 0, color: '#fff' }} />
+              </Menu.Item>
             )}
           </Menu.Menu>
         </Menu>

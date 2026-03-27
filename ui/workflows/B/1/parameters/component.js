@@ -12,8 +12,8 @@ class Parameters extends Component {
     <Item>
       <Item.Content>
         <Item.Header>
-          <h3>Model Data Format</h3>
-          <h5>Select the type of model data:</h5>
+          <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '15px', color: '#333', margin: '0 0 8px 0' }}>Model Data Format</h3>
+          <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>Select the type of model data:</h5>
         </Item.Header>
 
         <Item.Description>
@@ -63,14 +63,14 @@ class Parameters extends Component {
       <Item>
         <Item.Content>
           <Item.Header>
-            <h3>Calibration period (Model data time)</h3>
+            <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '15px', color: '#333', margin: '0 0 8px 0' }}>Calibration period (Model data time)</h3>
             <br />
           </Item.Header>
 
           <Grid columns={2}>
             <Grid.Column>
               <Item.Header>
-                <h5>Start date</h5>
+                <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>Start date</h5>
               </Item.Header>
 
               <Item.Description>
@@ -88,7 +88,7 @@ class Parameters extends Component {
             </Grid.Column>
             <Grid.Column>
               <Item.Header>
-                <h5>End date</h5>
+                <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>End date</h5>
               </Item.Header>
 
               <Item.Description>
@@ -119,14 +119,15 @@ class Parameters extends Component {
     <Item>
       <Item.Content>
         <Item.Header>
-          <h3>Spin-up Window</h3>
-          <h5>
+          <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '15px', color: '#333', margin: '0 0 8px 0' }}>Spin-up Window</h3>
+          <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>
             Enter length of the spin-up window: &nbsp;&nbsp;&nbsp;
             <Popup trigger={<Icon name="info circle" />} size="tiny">
               Only forecast leadtimes greater than or equal to this value will be
               considered.
             </Popup>
           </h5>
+
         </Item.Header>
 
         <Item.Description>
@@ -150,7 +151,7 @@ class Parameters extends Component {
 
   getModelIntervalField = () => (
     <>
-      <h5>Interval between model runs:</h5>
+      <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>Interval between model runs:</h5>
       <Input
         error={this.modelIntervalHasError()}
         onChange={e => this.props.onModelIntervalChange(e.target.value)}
@@ -169,7 +170,7 @@ class Parameters extends Component {
 
   getStepIntervalField = () => (
     <>
-      <h5>Interval between forecast's validity times:</h5>
+      <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>Interval between forecast's validity times:</h5>
       <Input
         error={this.stepIntervalHasError()}
         onChange={e => this.props.onStepIntervalChange(e.target.value)}
@@ -190,7 +191,7 @@ class Parameters extends Component {
 
   getStartTimeField = () => (
     <>
-      <h5>First model run on a day:</h5>
+      <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>First model run on a day:</h5>
       <Input
         error={this.startTimeHasError()}
         onChange={e => this.props.onStartTimeFieldChange(e.target.value)}
@@ -214,7 +215,7 @@ class Parameters extends Component {
     <Grid container centered>
       <Grid.Column>
         <Card fluid color="black">
-          <Card.Header>
+          <Card.Header style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: '18px' }}>
             <Grid.Column floated="left">Model Data — General parameters</Grid.Column>
             <Grid.Column floated="right">
               {this.isComplete() && <Icon name="check circle" />}
@@ -230,8 +231,8 @@ class Parameters extends Component {
                   <Item>
                     <Item.Content>
                       <Item.Header>
-                        <h3>Model Runs</h3>
-                        <h5>
+                        <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '15px', color: '#333', margin: '0 0 8px 0' }}>Model Runs</h3>
+                        <h5 style={{ fontFamily: "'Work Sans', sans-serif", fontWeight: 300, fontSize: '13px', color: '#333', margin: '0 0 6px 0' }}>
                           Select which model runs are going to be considered in the
                           calibration.
                         </h5>
