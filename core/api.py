@@ -57,7 +57,25 @@ def handle_error(e):
 is_computation_running = False
 
 
-def evaluate_wts_direct(thrL_out, thrH_out, loader, error_col):
+def is_full_range(lo, hi, pred_name=None, field_ranges=None):
+    """Check if (lo, hi) represents the full range for a predictor.
+
+    Handles both literal -inf/inf AND circular predictors whose full range
+    is finite (e.g., LST: 0 to 24).
+    """
+    if numpy.isneginf(lo) and numpy.isposinf(hi):
+        return True
+    if field_ranges and pred_name and pred_name in field_ranges:
+        fr = field_ranges[pred_name]
+        if fr and len(fr) >= 2:
+            try:
+                return float(lo) == float(fr[0]) and float(hi) == float(fr[1])
+            except (ValueError, TypeError):
+                pass
+    return False
+
+
+def evaluate_wts_direct(thrL_out, thrH_out, loader, error_col, field_ranges=None):
     """Direct per-WT threshold evaluation.
 
     Unlike evaluate_all() which assumes a Cartesian product matrix structure,
@@ -92,8 +110,8 @@ def evaluate_wts_direct(thrL_out, thrH_out, loader, error_col):
                 continue
             lo = float(thrL_out.iloc[wt_idx, p_idx])
             hi = float(thrH_out.iloc[wt_idx, p_idx])
-            if np.isneginf(lo) and np.isposinf(hi):
-                continue  # unbounded — skip check
+            if is_full_range(lo, hi, pred_cols[p_idx], field_ranges):
+                continue  # full range (unbounded or circular) — skip check
             vals = pred_arrays[p_idx]
             mask &= (vals >= lo) & (vals < hi)
         wt_indices[mask & (wt_indices == -1)] = wt_idx
@@ -209,10 +227,17 @@ def get_wt_codes():
 
     thrL, thrH = df.iloc[:, ::2], df.iloc[:, 1::2]
 
+    import json as _json
+    with open("C:/Users/mofp/AppData/Local/Temp/wt_debug.log", "a") as _f:
+        _f.write(f"[get-wt-codes] ranges={_json.dumps({k: v for k, v in (ranges or {}).items()})}\n")
+        _f.write(f"[get-wt-codes] thrL columns={list(thrL.columns)}\n")
+        _f.write(f"[get-wt-codes] predictors will be={[c.replace('_thrL','') for c in thrL.columns]}\n")
+        _f.write(f"[get-wt-codes] first row thrL={thrL.iloc[0].tolist()}, thrH={thrH.iloc[0].tolist()}\n")
     dt = DecisionTree(threshold_low=thrL, threshold_high=thrH, ranges=ranges)
-    # Use _leaf_codes_direct to compute codes from the matrix directly.
-    # leaf_codes (tree traversal) can miss rows when unbounded nodes are skipped.
-    return jsonify({"codes": dt._leaf_codes_direct()})
+    codes = dt._leaf_codes_direct()
+    with open("C:/Users/mofp/AppData/Local/Temp/wt_debug.log", "a") as _f:
+        _f.write(f"[get-wt-codes] first 5 codes={codes[:5]}\n\n")
+    return jsonify({"codes": codes})
 
 
 @app.route("/postprocessing/count-wt-observations", methods=("POST",))
@@ -341,6 +366,7 @@ def get_wt_histogram():
         payload["numBins"],
         payload["cheaper"],
     )
+    field_ranges = payload.get("fieldRanges", None)
 
     loader = load_point_data_by_path(path, cheaper=cheaper)
 
@@ -354,7 +380,7 @@ def get_wt_histogram():
         thrL=thrL, thrH=thrH, thrL_labels=labels[::2], thrH_labels=labels[1::2]
     )
 
-    df, title_tokens = wt.evaluate(loader.error_type.name, loader=loader)
+    df, title_tokens = wt.evaluate(loader.error_type.name, loader=loader, field_ranges=field_ranges)
     title = wrap_title(title=title_tokens, chunk_size=6)
 
     error = df[loader.error_type.name]
@@ -389,7 +415,7 @@ def save_wt_histograms():
 
     # Direct per-WT evaluation (safe for asymmetric/pruned trees)
     error_col = loader.error_type.name
-    wt_indices, error_values = evaluate_wts_direct(thrL_out, thrH_out, loader, error_col)
+    wt_indices, error_values = evaluate_wts_direct(thrL_out, thrH_out, loader, error_col, field_ranges=None)
 
     dt = DecisionTree(threshold_low=thrL_out, threshold_high=thrH_out, ranges={})
 
@@ -513,7 +539,7 @@ def save_operation():
 
         # Direct per-WT evaluation (safe for asymmetric/pruned trees)
         error_col = loader.error_type.name
-        wt_indices, error_values = evaluate_wts_direct(thrL_out, thrH_out, loader, error_col)
+        wt_indices, error_values = evaluate_wts_direct(thrL_out, thrH_out, loader, error_col, field_ranges=ranges)
 
         dt = DecisionTree(threshold_low=thrL_out, threshold_high=thrH_out, ranges=ranges)
 
@@ -530,13 +556,15 @@ def save_operation():
             )
 
             wt_code = thrGridOut[idx][0]
+            wts_dir = os.path.join(path, "WTs")
+            os.makedirs(wts_dir, exist_ok=True)
             wt.plot(
                 wt_error,
                 bins,
                 title,
                 y_lim=int(ylim),
                 num_bins=int(num_bins),
-                out_path=os.path.join(path, f"WT_{wt_code}.png"),
+                out_path=os.path.join(wts_dir, f"WT_{wt_code}.png"),
             )
 
     if mode == "bias":
@@ -552,13 +580,13 @@ def save_operation():
 
         thrL_out, thrH_out = df.iloc[:, ::2], df.iloc[:, 1::2]
 
+        # output_path is already the full file path (e.g. .../Bias.csv)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         path = output_path
-        if mode == "bias":
-            path = path / "Bias.csv"
 
         # Direct per-WT evaluation (safe for asymmetric/pruned trees)
         error_col = loader.error_type.name
-        wt_indices, error_values = evaluate_wts_direct(thrL_out, thrH_out, loader, error_col)
+        wt_indices, error_values = evaluate_wts_direct(thrL_out, thrH_out, loader, error_col, field_ranges=ranges)
 
         csv = []
         for idx in range(len(thrL_out)):
@@ -704,6 +732,8 @@ def count_obs_per_wt():
         for p in range(num_predictors):
             lo = row[p * 2]
             hi = row[p * 2 + 1]
+            if is_full_range(lo, hi, pred_labels[p], ranges):
+                continue  # full range — skip check
             col = pdt[pred_labels[p]].to_numpy(dtype=numpy.float64)
             if lo != float('-inf'):
                 mask &= (col >= lo)
@@ -745,6 +775,10 @@ def eliminate_small_wts():
     num_cols = len(matrix[0])
     num_predictors = num_cols // 2
     pred_labels = [l.replace("_thrL", "") for l in labels[::2]]
+    print(f"[DEBUG eliminate] pred_labels={pred_labels}, ranges keys={list(ranges.keys()) if ranges else 'None'}", flush=True)
+    if ranges:
+        for pl in pred_labels:
+            print(f"  [DEBUG] pred '{pl}' in ranges? {pl in ranges}, range={ranges.get(pl, 'MISSING')}", flush=True)
     initial_count = len(matrix)
 
     # --- Optimization 3: Cache the PDT ---
@@ -777,7 +811,7 @@ def eliminate_small_wts():
             # Find the deepest bounded predictor (the leaf level)
             deepest = -1
             for p in range(num_predictors):
-                if row[p * 2] != float('-inf') or row[p * 2 + 1] != float('inf'):
+                if not is_full_range(row[p * 2], row[p * 2 + 1], pred_labels[p], ranges):
                     deepest = p
 
             if deepest < 0:
@@ -801,6 +835,8 @@ def eliminate_small_wts():
             for p in range(leaf_pred_idx):
                 lo = parent_key[p * 2]
                 hi = parent_key[p * 2 + 1]
+                if is_full_range(lo, hi, pred_labels[p], ranges):
+                    continue
                 col = cols[pred_labels[p]]
                 if lo != float('-inf'):
                     parent_mask &= (col >= lo)
@@ -812,6 +848,9 @@ def eliminate_small_wts():
 
             # Now check each sibling's leaf-level range on the filtered subset
             for mat_idx, leaf_lo, leaf_hi in members:
+                if is_full_range(leaf_lo, leaf_hi, pred_labels[leaf_pred_idx], ranges):
+                    counts[mat_idx] = int(parent_mask.sum())
+                    continue
                 leaf_mask = numpy.ones(len(filtered_leaf_col), dtype=bool)
                 if leaf_lo != float('-inf'):
                     leaf_mask &= (filtered_leaf_col >= leaf_lo)
@@ -826,7 +865,7 @@ def eliminate_small_wts():
         deepest = -1
         for p in range(num_predictors):
             lo, hi = row[p * 2], row[p * 2 + 1]
-            if lo != float('-inf') or hi != float('inf'):
+            if not is_full_range(lo, hi, pred_labels[p], ranges):
                 deepest = p
         if deepest <= 0:
             return ()

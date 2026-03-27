@@ -378,11 +378,13 @@ class DecisionTree(object):
             for row_idx in range(n):
                 ul, uh = float(low_vals[row_idx]), float(high_vals[row_idx])
                 is_literal = np.isneginf(ul) and np.isposinf(uh)
-                is_range = (
-                    pred_range is not None
-                    and int_or_float(low_vals[row_idx]) == pred_range[0]
-                    and int_or_float(high_vals[row_idx]) == pred_range[1]
-                )
+                is_range = False
+                if pred_range is not None:
+                    fr_lo, fr_hi = float(pred_range[0]), float(pred_range[1])
+                    is_range = (ul == fr_lo and uh == fr_hi)
+                    if row_idx == 0:
+                        with open("C:/Users/mofp/AppData/Local/Temp/wt_debug.log", "a") as _dbg:
+                            _dbg.write(f"  [_leaf_codes_direct] pred={pred}, pred_range={pred_range}, fr_lo={fr_lo}, fr_hi={fr_hi}, ul={ul}, uh={uh}, is_literal={is_literal}, is_range={is_range}\n")
                 if is_literal or is_range:
                     is_unbounded[row_idx] = True
 
@@ -580,7 +582,7 @@ class WeatherType(object):
     ]
 
     def evaluate(
-        self, *cols: str, loader: BasePointDataReader
+        self, *cols: str, loader: BasePointDataReader, field_ranges=None
     ) -> Tuple[pd.DataFrame, Tuple]:
         self.error_type = loader.error_type
 
@@ -596,6 +598,32 @@ class WeatherType(object):
             thrH_temp = self.thrH[thrH_label]
 
             predictor_shortname = thrL_label.replace("_thrL", "")
+
+            # Skip full-range predictors (both literal -inf/inf and circular full range)
+            is_literal_full = (
+                np.isneginf(float(thrL_temp)) and np.isposinf(float(thrH_temp))
+            )
+            is_field_full = False
+            if field_ranges and predictor_shortname in field_ranges:
+                fr = field_ranges[predictor_shortname]
+                if fr and len(fr) >= 2:
+                    try:
+                        is_field_full = (
+                            float(thrL_temp) == float(fr[0])
+                            and float(thrH_temp) == float(fr[1])
+                        )
+                    except (ValueError, TypeError):
+                        pass
+
+            if is_literal_full or is_field_full:
+                title_pred += (
+                    "({low} <= {pred} < {high})".format(
+                        low=int_or_float(thrL_temp),
+                        pred=predictor_shortname,
+                        high=int_or_float(thrH_temp),
+                    ),
+                )
+                continue  # full range — no filtering needed
 
             if loader.cheaper:
                 temp_pred: pd.Series = loader.select(predictor_shortname)

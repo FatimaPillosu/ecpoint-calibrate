@@ -102,12 +102,25 @@ class SparseBreakpoints extends Component {
             />
             {this.props.hierarchyChanged && (() => {
               const dataRows = this.props.sparseBreakpoints.slice(1)
-              const hasCustomValues = dataRows.some(row =>
-                row.slice(1).some(cell => {
+              const fieldRanges = this.props.fieldRanges || {}
+              const fields = this.props.fields || []
+              const hasCustomValues = dataRows.some(row => {
+                const cells = row.slice(1)
+                return cells.some((cell, idx) => {
                   const v = String(cell.value).trim()
-                  return v !== '' && v !== '-inf' && v !== 'inf'
+                  if (v === '' || v === '-inf' || v === 'inf') return false
+                  // Check if it's a field range boundary (e.g., 0/24 for circular predictors)
+                  const fieldIdx = Math.floor(idx / 2)
+                  const field = fields[fieldIdx]
+                  const fr = field && fieldRanges[field]
+                  if (fr) {
+                    const isLow = idx % 2 === 0
+                    const rangeVal = String(isLow ? fr[0] : fr[1])
+                    if (v === rangeVal) return false
+                  }
+                  return true
                 })
-              )
+              })
               return hasCustomValues ? (
                 <span style={{ fontSize: '12px', color: '#d32f2f', fontWeight: 'bold', fontFamily: "'Work Sans', sans-serif" }}>
                   ⚠️ Hierarchy modified! Generate the new symmetrical decision tree.
@@ -121,7 +134,13 @@ class SparseBreakpoints extends Component {
               onClick={() => {
                 const headerRow = this.props.sparseBreakpoints[0]
                 const blankRow = [{ readOnly: true, value: 1 }].concat(
-                  _.flatMap(this.props.fields, () => [{ value: '-inf' }, { value: 'inf' }])
+                  _.flatMap(this.props.fields, (field) => {
+                    const fr = this.props.fieldRanges && this.props.fieldRanges[field]
+                    if (fr && fr[0] !== '-inf' && fr[1] !== 'inf') {
+                      return [{ value: String(fr[0]) }, { value: String(fr[1]) }]
+                    }
+                    return [{ value: '-inf' }, { value: 'inf' }]
+                  })
                 )
                 this.props.setSparseBreakpoints([headerRow, blankRow])
                 // Auto-generate the decision tree after reset

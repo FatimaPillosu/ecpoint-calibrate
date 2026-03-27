@@ -183,9 +183,9 @@ class SaveOperation extends Component {
     if (this.props.mode === 'mf') {
       return `${this.props.error}.csv`
     } else if (this.props.mode === 'breakpoints') {
-      return 'BreakPointsWT.csv'
+      return 'BP.csv'
     } else if (this.props.mode === 'bias') {
-      return 'BiasesWT.csv'
+      return 'Bias.csv'
     }
     return null
   }

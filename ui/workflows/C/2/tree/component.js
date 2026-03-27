@@ -346,9 +346,9 @@ export default class TreeContainer extends Component {
       const thrL = matrix[i][level * 2]
       const thrH = matrix[i][level * 2 + 1]
 
-      // Only split if the range at this level is unbounded (-inf to inf)
+      // Only split if the range at this level is full range (unbounded or circular full range)
       // meaning this predictor hasn't been split yet for this WT
-      if (thrL === '-inf' && thrH === 'inf') {
+      if (this.isFullRange(thrL, thrH, level)) {
         // Apply each breakpoint value (in descending order)
         sortedValues.forEach(value => {
           const source = [...matrix[i]]
@@ -378,6 +378,21 @@ export default class TreeContainer extends Component {
     }, 200)
   }
 
+  isFullRange = (thrL, thrH, fieldIdx) => {
+    const lo = String(thrL)
+    const hi = String(thrH)
+    if (lo === '-inf' && hi === 'inf') return true
+    // Check circular predictor full range
+    if (this.props.fieldRanges && this.props.fields) {
+      const field = this.props.fields[fieldIdx]
+      const fr = field && this.props.fieldRanges[field]
+      if (fr && String(fr[0]) !== '-inf' && String(fr[1]) !== 'inf') {
+        return lo === String(fr[0]) && hi === String(fr[1])
+      }
+    }
+    return false
+  }
+
   getDeepestLeafLevel = () => {
     // Find the deepest bounded predictor level across all leaves in the breakpoints
     if (!this.props.breakpoints || this.props.breakpoints.length === 0 || !this.props.fields) return 0
@@ -385,9 +400,7 @@ export default class TreeContainer extends Component {
     this.props.breakpoints.forEach(row => {
       const thresholds = row.slice(2) // skip WT code and count
       for (let i = this.props.fields.length - 1; i >= 0; i--) {
-        const thrL = String(thresholds[i * 2])
-        const thrH = String(thresholds[i * 2 + 1])
-        if (thrL !== '-inf' || thrH !== 'inf') {
+        if (!this.isFullRange(thresholds[i * 2], thresholds[i * 2 + 1], i)) {
           if (i + 1 > maxLevel) maxLevel = i + 1
           break
         }
@@ -600,6 +613,7 @@ export default class TreeContainer extends Component {
         numBins: this.props.numBins,
         bins: this.props.bins,
         cheaper: this.props.cheaper,
+        fieldRanges: this.props.fieldRanges,
       })
       .then(response => {
         this.updatePanelImage(slotIndex, response.data.histogram)
