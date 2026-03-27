@@ -227,16 +227,8 @@ def get_wt_codes():
 
     thrL, thrH = df.iloc[:, ::2], df.iloc[:, 1::2]
 
-    import json as _json
-    with open("C:/Users/mofp/AppData/Local/Temp/wt_debug.log", "a") as _f:
-        _f.write(f"[get-wt-codes] ranges={_json.dumps({k: v for k, v in (ranges or {}).items()})}\n")
-        _f.write(f"[get-wt-codes] thrL columns={list(thrL.columns)}\n")
-        _f.write(f"[get-wt-codes] predictors will be={[c.replace('_thrL','') for c in thrL.columns]}\n")
-        _f.write(f"[get-wt-codes] first row thrL={thrL.iloc[0].tolist()}, thrH={thrH.iloc[0].tolist()}\n")
     dt = DecisionTree(threshold_low=thrL, threshold_high=thrH, ranges=ranges)
     codes = dt._leaf_codes_direct()
-    with open("C:/Users/mofp/AppData/Local/Temp/wt_debug.log", "a") as _f:
-        _f.write(f"[get-wt-codes] first 5 codes={codes[:5]}\n\n")
     return jsonify({"codes": codes})
 
 

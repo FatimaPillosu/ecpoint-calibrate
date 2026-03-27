@@ -382,9 +382,6 @@ class DecisionTree(object):
                 if pred_range is not None:
                     fr_lo, fr_hi = float(pred_range[0]), float(pred_range[1])
                     is_range = (ul == fr_lo and uh == fr_hi)
-                    if row_idx == 0:
-                        with open("C:/Users/mofp/AppData/Local/Temp/wt_debug.log", "a") as _dbg:
-                            _dbg.write(f"  [_leaf_codes_direct] pred={pred}, pred_range={pred_range}, fr_lo={fr_lo}, fr_hi={fr_hi}, ul={ul}, uh={uh}, is_literal={is_literal}, is_range={is_range}\n")
                 if is_literal or is_range:
                     is_unbounded[row_idx] = True
 
