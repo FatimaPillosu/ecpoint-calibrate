@@ -6,7 +6,7 @@ echo === ecPoint-Calibrate Web App ===
 echo.
 
 echo Starting Flask backend on port 8888...
-start /B python -m core.api
+start /B .venv\Scripts\python.exe -m core.api
 
 REM Wait a moment for Flask to start
 timeout /t 2 /nobreak >nul

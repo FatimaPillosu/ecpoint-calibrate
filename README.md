@@ -59,15 +59,28 @@ appimagetool squashfs-root ecPoint-Calibrate-0.30.0.AppImage
 
 ## Python Backend
 
-We need `metview-batch` from conda-forge so unfortunately need to use `conda` with `poetry`.
+GRIB and geopoints I/O is handled by `earthkit-data` / `earthkit-geo` (which
+bundle the eccodes engine via pip wheels), so the backend no longer requires
+`metview-batch` or a conda environment — a plain virtualenv works.
 
 ### Creating the environment
 
 ```
-conda create --name ecpoint_calibrate_env --file conda-linux-64.lock
-conda activate ecpoint_calibrate_env
-poetry install
+python3.11 -m venv .venv
+.venv/bin/pip install -e .          # or: poetry install
 ```
+
+On Windows:
+
+```
+py -3.11 -m venv .venv
+.venv\Scripts\pip install -e .
+```
+
+> Note: the conda lock files (`environment.yml`, `conda-linux-64.lock`) and the
+> `poetry.lock` / `Pipfile.lock` files predate the earthkit migration and still
+> reference metview. Regenerate them (`poetry lock`, `conda-lock`) before relying
+> on them; they are no longer needed for a basic pip/venv install.
 
 ### Activating the environment
 

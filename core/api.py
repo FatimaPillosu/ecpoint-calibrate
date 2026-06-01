@@ -138,6 +138,28 @@ def get_computation_status():
     return jsonify({"isRunning": is_computation_running})
 
 
+@app.route("/computations/logs", methods=("GET",))
+def get_computation_logs():
+    # Serve the log from the backend that writes it, so the reader can't end up
+    # pointed at a different temp dir than the writer (the two processes resolve
+    # tempfile paths independently). werkzeug HTTP access lines are filtered out
+    # so the live panel isn't flooded by its own polling requests.
+    from core.processor import _log_path
+
+    try:
+        lines = int(request.args.get("lines", 500))
+    except (TypeError, ValueError):
+        lines = 500
+
+    try:
+        with open(_log_path, "r") as f:
+            content = [ln for ln in f.read().splitlines() if "werkzeug" not in ln]
+        tail = "\n".join(content[-lines:])
+        return jsonify({"content": tail, "path": _log_path, "totalLines": len(content)})
+    except FileNotFoundError:
+        return jsonify({"content": "No computation log yet.", "path": _log_path, "totalLines": 0})
+
+
 @app.route("/predictors", methods=("POST",))
 def get_predictors():
     payload = request.get_json()

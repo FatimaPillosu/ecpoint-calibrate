@@ -70,7 +70,9 @@ class Observations(object):
 
     units = attr.ib(converter=str)
 
-    displayWarning = attr.ib(converter=str)
+    # Optional UI flag; not consumed by the backend. Defaulted so a request
+    # that omits it (e.g. the functional test cassette) still builds a Config.
+    displayWarning = attr.ib(converter=str, default="")
 
 
 @attr.s

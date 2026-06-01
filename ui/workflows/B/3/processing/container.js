@@ -12,6 +12,8 @@ const mapStateToProps = state => ({
   parameters: state.parameters,
   computations: state.computations,
   running: state.processing.running,
+  // Full state snapshot used to save a reproducible computation config.
+  reduxState: state,
 })
 
 const mapDispatchToProps = dispatch => ({

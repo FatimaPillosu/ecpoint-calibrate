@@ -1,25 +1,57 @@
 import React, { Component } from 'react'
 
-import { Grid, Button, Modal } from 'semantic-ui-react'
-import Iframe from 'react-iframe'
+import { Grid, Button } from 'semantic-ui-react'
 
 import client from '~/utils/client'
-import { errorHandler } from '~/utils/toast'
-import { readLogs } from '~/utils/fileBrowser'
+import { errorHandler, toast } from '~/utils/toast'
+import { writeFileContent } from '~/utils/fileBrowser'
+import FileBrowser from '~/components/FileBrowser'
 
 class Processing extends Component {
-  state = { status: 'initial', logContent: null, logModalOpen: false }
+  state = {
+    // The log panel stays empty until the user launches a computation in THIS
+    // session — it never shows a previous run's log on mount/load/navigation.
+    launched: false,
+    liveLog: '',
+    configBrowserOpen: false,
+  }
 
   componentDidMount() {
+    // Only poll run status here (to disable the button while running). The log
+    // is NOT polled until the user clicks Launch — see startLogPolling().
     this.interval = setInterval(this.updateComputationsStatus, 7000)
   }
 
   componentWillUnmount() {
     clearInterval(this.interval)
+    clearInterval(this.logInterval)
+  }
+
+  startLogPolling = () => {
+    clearInterval(this.logInterval)
+    this.logInterval = setInterval(this.refreshLiveLog, 3000)
+    this.refreshLiveLog()
+  }
+
+  refreshLiveLog = () =>
+    client
+      .get('/computations/logs')
+      .then(response => {
+        this.setState({ liveLog: response.data.content }, this.scrollLogToBottom)
+      })
+      .catch(() => {})
+
+  scrollLogToBottom = () => {
+    if (this.logBox) {
+      this.logBox.scrollTop = this.logBox.scrollHeight
+    }
   }
 
   runComputation() {
     this.props.setProcessing(true)
+    // Only now do we start showing/polling the log — for this run only.
+    this.setState({ launched: true })
+    this.startLogPolling()
 
     const parameters = {
       date_start: this.props.parameters.date_start,
@@ -60,14 +92,35 @@ class Processing extends Component {
         this.props.completeSection()
       })
       .catch(errorHandler)
-      .then(() => this.props.setProcessing(false))
+      .then(() => {
+        this.props.setProcessing(false)
+        this.refreshLiveLog()
+        clearInterval(this.logInterval) // run finished — stop polling
+      })
   }
 
+  // Background poll — fail silently so a transient backend hiccup doesn't spam
+  // error toasts; it self-heals on the next tick.
   updateComputationsStatus = () =>
     client
       .get('/computations/status')
       .then(response => this.props.setProcessing(response.data.isRunning))
-      .catch(errorHandler)
+      .catch(() => {})
+
+  // --- Save computation config (reproducibility) ---
+  openConfigBrowser = () => this.setState({ configBrowserOpen: true })
+  closeConfigBrowser = () => this.setState({ configBrowserOpen: false })
+
+  handleConfigSelected = async path => {
+    this.closeConfigBrowser()
+    try {
+      await writeFileContent(path, JSON.stringify(this.props.reduxState, null, 2))
+      toast.success(`Computation config saved to ${path}`)
+    } catch (e) {
+      console.error('Failed to save computation config:', e)
+      toast.error('Failed to save computation config.')
+    }
+  }
 
   render = () => (
     <>
@@ -82,47 +135,47 @@ class Processing extends Component {
           />
 
           <Button
-            content="Open log file"
-            onClick={() => {
-              readLogs(null, 500)
-                .then(data => this.setState({ logContent: data.content, logModalOpen: true }))
-                .catch(() => this.setState({ logContent: 'Could not read log file.', logModalOpen: true }))
-            }}
-            icon="file"
+            content="Save computation config"
+            onClick={this.openConfigBrowser}
+            icon="save"
             labelPosition="left"
+            title="Save all inputs and computations to a JSON file for reproducibility"
           />
         </Grid.Row>
         <Grid.Row>
           <Grid.Column>
-            <Iframe
-              url="http://localhost:9001"
-              width="100%"
-              height="750px"
-              display="initial"
-              position="relative"
-            />
+            <pre
+              ref={el => (this.logBox = el)}
+              style={{
+                height: '750px',
+                overflow: 'auto',
+                background: '#1e1e1e',
+                color: '#d4d4d4',
+                fontFamily: 'Consolas, Menlo, monospace',
+                fontSize: '12px',
+                padding: '12px',
+                borderRadius: '4px',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                margin: 0,
+              }}
+            >
+              {this.state.launched
+                ? this.state.liveLog || 'Starting computation…'
+                : 'Click “Launch computation” to start a run — progress will stream here.'}
+            </pre>
           </Grid.Column>
         </Grid.Row>
       </Grid>
 
-      <Modal
-        open={this.state.logModalOpen}
-        onClose={() => this.setState({ logModalOpen: false, logContent: null })}
-        size="large"
-      >
-        <Modal.Header>Log File — /var/tmp/ecpoint.logs</Modal.Header>
-        <Modal.Content scrolling>
-          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: '60vh' }}>
-            {this.state.logContent || 'No log content available.'}
-          </pre>
-        </Modal.Content>
-        <Modal.Actions>
-          <Button
-            content="Close"
-            onClick={() => this.setState({ logModalOpen: false, logContent: null })}
-          />
-        </Modal.Actions>
-      </Modal>
+      <FileBrowser
+        open={this.state.configBrowserOpen}
+        onClose={this.closeConfigBrowser}
+        onSelect={this.handleConfigSelected}
+        mode="saveFile"
+        filter="*.json"
+        defaultFileName="ecpoint-configuration.json"
+      />
     </>
   )
 }

@@ -38,6 +38,19 @@ logging.getLogger("").addHandler(console)
 
 
 def run(config: Config):
+    # Truncate the log at the start of each run so the live log panel shows only
+    # the current computation, not logs left over from earlier runs in this
+    # process. (FileHandler is the basicConfig file log; the console
+    # StreamHandler is skipped.)
+    for _h in logging.getLogger().handlers:
+        if isinstance(_h, logging.FileHandler):
+            try:
+                _h.acquire()
+                _h.stream.seek(0)
+                _h.stream.truncate(0)
+            finally:
+                _h.release()
+
     BaseDateS = config.parameters.date_start
     BaseDateF = config.parameters.date_end
     acc = config.predictand.accumulation
@@ -102,6 +115,9 @@ def run(config: Config):
     counter_used_FC = {}
     obsTOT = 0
     obsUSED = 0
+    # Set when the reference (predictand) computation runs; stays None if no
+    # observations are ever processed, guarding the footer logic below.
+    ref_code = None
     model_interval = config.parameters.model_interval
     step_interval = config.parameters.step_interval
     BaseTimeS = config.parameters.start_time
@@ -194,11 +210,11 @@ def run(config: Config):
                 PathOBS
                 / f"Acc{acc:02}h"
                 / DateVF
-                / f"{config.predictand.code}{acc:02d}_obs_{DateVF}{HourVF}.geo"
+                / f"{config.predictand.code}_{acc:02d}_{DateVF}_{HourVF}.geo"
             )
         else:
             obs_path = (
-                PathOBS / DateVF / f"{config.predictand.code}_obs_{DateVF}{HourVF}.geo"
+                PathOBS / DateVF / f"{config.predictand.code}_{DateVF}_{HourVF}.geo"
             )
 
         # Reading Rainfall Observations

@@ -16,11 +16,15 @@ const mapDispatchToProps = dispatch => ({
   setWorkflow: workflow => dispatch(setWorkflow(workflow)),
   resetApp: () => dispatch({ type: 'RESET_APP' }),
   loadWorkflow: data => {
-    dispatch({ type: 'LOAD_WORKFLOW', data })
-    dispatch({
-      type: 'PAGE.SET_PAGE',
-      page: 1,
-    })
+    // Restore saved inputs but force the active page to Input Parameters and
+    // clear any running flag, so loading a config never (re)mounts the
+    // Processing component and auto-starts a computation.
+    const safe = {
+      ...data,
+      page: { ...(data.page || {}), activePageNumber: 1 },
+      processing: { ...(data.processing || {}), running: false },
+    }
+    dispatch({ type: 'LOAD_WORKFLOW', data: safe })
   },
 
   warmupPredictorMetadataCache: path => dispatch(warmupPredictorMetadataCache(path)),

@@ -1,5 +1,18 @@
+"""GRIB fieldset loader.
+
+Replaces the previous Metview-backed wrapper. GRIB messages are read with
+earthkit-data; field values are held as numpy arrays so that arithmetic,
+reductions and nearest-gridpoint extraction are plain numpy / earthkit-geo
+operations rather than Metview macro calls.
+
+A :class:`Fieldset` wraps a single earthkit ``GribField`` (kept for grid
+geometry and metadata) plus an optional numpy values override produced by
+arithmetic. Operations never mutate the source field.
+"""
+
 import logging
 import os
+import threading
 from functools import reduce
 from pathlib import Path
 from typing import Union
@@ -8,46 +21,44 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-_metview = None
-_FieldsetBase = None
+_ekd = None
+
+# eccodes' GRIB-definition parser uses a non-reentrant flex scanner: two GRIB
+# reads running concurrently (e.g. a predictor-metadata request overlapping a
+# computation under Flask's threaded dev server) corrupt its shared state and
+# abort the process ("fatal flex scanner internal error"). Serialise every
+# eccodes-touching operation behind this lock so only one runs at a time.
+_ECCODES_LOCK = threading.RLock()
 
 
-def _get_metview():
-    global _metview, _FieldsetBase
-    if _metview is None:
-        import metview
-        _metview = metview
-        _FieldsetBase = metview.Fieldset
-    return _metview
+def _get_ekd():
+    """Import earthkit-data lazily so the module imports without it installed."""
+    global _ekd
+    if _ekd is None:
+        import earthkit.data as ekd
 
-
-def _get_fieldset_base():
-    if _FieldsetBase is None:
-        _get_metview()
-    return _FieldsetBase
+        _ekd = ekd
+    return _ekd
 
 
 class Fieldset:
-    """
-    Wrapper around metview.Fieldset. The actual metview base class is
-    applied dynamically at construction time (via from_path) so the
-    module can be imported without metview being installed.
-    """
+    """Numpy-backed wrapper around a single earthkit GRIB field."""
 
-    def __init__(self, path):
-        raise PermissionError("Initializing this class directly is not allowed.")
+    __slots__ = ("_field", "_values", "_latlon", "_kdtree", "_units", "_name")
 
-    @property
-    def units(self):
-        return _get_metview().grib_get_string(self, "units")
-
-    @property
-    def name(self) -> str:
-        return _get_metview().grib_get_string(self, "name")
+    def __init__(self, field, values=None):
+        # `field` is an earthkit GribField (source of geometry + metadata).
+        # `values` optionally overrides the field's own values (after arithmetic).
+        self._field = field
+        self._values = None if values is None else np.asarray(values)
+        self._latlon = None
+        self._kdtree = None
+        self._units = None
+        self._name = None
 
     @classmethod
-    def from_path(cls, path: Union[Path, str]):
-        mv = _get_metview()
+    def from_path(cls, path: Union[Path, str]) -> "Fieldset":
+        ekd = _get_ekd()
 
         if isinstance(path, Path):
             path = str(path)
@@ -55,151 +66,121 @@ class Fieldset:
         if not os.path.exists(path):
             raise IOError(f"File does not exist: {path}")
 
-        obj = mv.read(path)
-        # Dynamically make Fieldset inherit from metview.Fieldset
-        if not issubclass(cls, _get_fieldset_base()):
-            cls.__bases__ = (_get_fieldset_base(),)
-        obj.__class__ = cls
-        return obj
+        with _ECCODES_LOCK:
+            fieldlist = ekd.from_source("file", path)
+            if len(fieldlist) == 0:
+                raise ValueError(f"No GRIB messages found in: {path}")
+            # ecPoint reads one predictor/step per file; operate on first field.
+            return cls(fieldlist[0])
 
     @property
-    def dataframe(self):
-        data_variables = list(self.to_dataset().data_vars)
-        return self.to_dataset().to_dataframe()[
-            ["latitude", "longitude"] + data_variables
-        ]
-
-    def nearest_gridpoint(self, geopoints):
-        return _get_metview().nearest_gridpoint(self, geopoints)
+    def units(self) -> str:
+        if self._units is None:
+            with _ECCODES_LOCK:
+                self._units = self._field.metadata("units")
+        return self._units
 
     @property
-    def values(self):
-        return _get_metview().values(self)
+    def name(self) -> str:
+        if self._name is None:
+            with _ECCODES_LOCK:
+                self._name = self._field.metadata("name")
+        return self._name
+
+    @property
+    def values(self) -> np.ndarray:
+        if self._values is None:
+            with _ECCODES_LOCK:
+                self._values = np.asarray(self._field.values)
+        return self._values
 
     @values.setter
     def values(self, values):
         raise NotImplementedError
 
-    @classmethod
-    def vector_of(cls, *args):
-        mv = _get_metview()
-        if len(args) == 0:
-            raise Exception
+    def _latlons(self):
+        if self._latlon is None:
+            with _ECCODES_LOCK:
+                ll = self._field.to_latlon()
+            self._latlon = (
+                np.asarray(ll["lat"]).ravel(),
+                np.asarray(ll["lon"]).ravel(),
+            )
+        return self._latlon
 
-        term_1 = args[0]
-        sum_squared_values = sum(abs(term.values) ** 2 for term in args)
-        values = np.sqrt(sum_squared_values)
+    @property
+    def dataframe(self):
+        import pandas as pd
 
-        mv_fieldset = mv.set_values(term_1, values)
-        mv_fieldset.__class__ = cls
-        return mv_fieldset
-
-    @classmethod
-    def max_of(cls, *args):
-        mv = _get_metview()
-        if len(args) == 0:
-            raise Exception
-
-        term_1 = args[0]
-        values = reduce(np.maximum, (arg.values for arg in args))
-
-        mv_fieldset = mv.set_values(term_1, values)
-        mv_fieldset.__class__ = cls
-        return mv_fieldset
-
-    @classmethod
-    def min_of(cls, *args):
-        mv = _get_metview()
-        if len(args) == 0:
-            raise Exception
-
-        term_1 = args[0]
-        values = reduce(np.minimum, (arg.values for arg in args))
-
-        mv_fieldset = mv.set_values(term_1, values)
-        mv_fieldset.__class__ = cls
-        return mv_fieldset
-
-    def __add__(self, other):
-        mv_fieldset = super().__add__(other)
-        mv_fieldset.__class__ = type(self)
-        return mv_fieldset
-
-    def __sub__(self, other):
-        mv_fieldset = super().__sub__(other)
-        mv_fieldset.__class__ = type(self)
-        return mv_fieldset
-
-    def __mul__(self, other):
-        mv_fieldset = super().__mul__(other)
-        mv_fieldset.__class__ = type(self)
-        return mv_fieldset
-
-    def __truediv__(self, other):
-        mv_fieldset = super().__truediv__(other)
-        mv_fieldset.__class__ = type(self)
-        return mv_fieldset
-
-    def __pow__(self, other):
-        mv_fieldset = super().__pow__(other)
-        mv_fieldset.__class__ = type(self)
-        return mv_fieldset
-
-
-class NetCDF:
-    def __init__(self, dataframe):
-        self.dataframe = dataframe
-
-    @classmethod
-    def from_path(cls, path: Union[Path, str]):
-        mv = _get_metview()
-
-        if isinstance(path, Path):
-            path = str(path)
-
-        mv_instance = mv.read(path)
-
-        dataset = mv_instance.to_dataset()
-        data_vars = list(dataset.data_vars)
-        coords = list(
-            {"lat", "lon", "latitude", "longitude", "latitudes", "longitudes"}
-            & set(dataset.coords)
+        lat, lon = self._latlons()
+        return pd.DataFrame(
+            {
+                "latitude": lat,
+                "longitude": lon,
+                self.name: self.values.ravel(),
+            }
         )
 
-        df = dataset.to_dataframe().reset_index()
-        df = df[coords + data_vars]
+    def nearest_gridpoint(self, geopoints):
+        """Return a Geopoints of this field sampled at the nearest grid point
+        to each observation location."""
+        from earthkit.geo.distance import GeoKDTree
 
-        for coord in coords:
-            df[coord] = df[coord].apply(str)
+        from core.loaders.geopoints import Geopoints
 
-        return cls(df)
+        lat, lon = self._latlons()
+        if self._kdtree is None:
+            self._kdtree = GeoKDTree(lat, lon)
 
-    def __mul__(self, other):
-        s = self.dataframe.select_dtypes(include=[np.number]) * other
-        df = self.dataframe.copy()
-        df[s.columns] = s
-        return type(self)(df)
+        obs_lat = geopoints.latitudes()
+        obs_lon = geopoints.longitudes()
+        idx, _ = self._kdtree.nearest_point((obs_lat, obs_lon))
+        idx = np.asarray(idx)
 
-    def __add__(self, other):
-        s = self.dataframe.select_dtypes(include=[np.number]) + other
-        df = self.dataframe.copy()
-        df[s.columns] = s
-        return type(self)(df)
+        sampled = self.values.ravel()[idx]
+        return Geopoints(obs_lat, obs_lon, sampled)
 
-    def __sub__(self, other):
-        s = self.dataframe.select_dtypes(include=[np.number]) - other
-        df = self.dataframe.copy()
-        df[s.columns] = s
-        return type(self)(df)
+    # --- reductions across multiple fields ---
+    @classmethod
+    def vector_of(cls, *args) -> "Fieldset":
+        if len(args) == 0:
+            raise Exception
 
-    def __truediv__(self, other):
-        s = self.dataframe.select_dtypes(include=[np.number]) / other
-        df = self.dataframe.copy()
-        df[s.columns] = s
-        return type(self)(df)
+        sum_squared_values = sum(abs(term.values) ** 2 for term in args)
+        values = np.sqrt(sum_squared_values)
+        return cls(args[0]._field, values=values)
 
-    def __pow__(self, power, modulo=None):
-        s = self.dataframe.select_dtypes(include=[np.number]) ** power
-        df = self.dataframe.copy()
-        df[s.columns] = s
-        return type(self)(df)
+    @classmethod
+    def max_of(cls, *args) -> "Fieldset":
+        if len(args) == 0:
+            raise Exception
+
+        values = reduce(np.maximum, (arg.values for arg in args))
+        return cls(args[0]._field, values=values)
+
+    @classmethod
+    def min_of(cls, *args) -> "Fieldset":
+        if len(args) == 0:
+            raise Exception
+
+        values = reduce(np.minimum, (arg.values for arg in args))
+        return cls(args[0]._field, values=values)
+
+    # --- element-wise arithmetic (returns a new Fieldset, never mutates) ---
+    def _operand(self, other):
+        return other.values if isinstance(other, Fieldset) else other
+
+    def __add__(self, other) -> "Fieldset":
+        return Fieldset(self._field, values=self.values + self._operand(other))
+
+    def __sub__(self, other) -> "Fieldset":
+        return Fieldset(self._field, values=self.values - self._operand(other))
+
+    def __mul__(self, other) -> "Fieldset":
+        return Fieldset(self._field, values=self.values * self._operand(other))
+
+    def __truediv__(self, other) -> "Fieldset":
+        return Fieldset(self._field, values=self.values / self._operand(other))
+
+    def __pow__(self, other) -> "Fieldset":
+        return Fieldset(self._field, values=self.values ** self._operand(other))
