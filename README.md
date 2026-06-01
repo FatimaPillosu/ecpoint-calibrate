@@ -34,10 +34,9 @@ npm install
 npm run build             # bundles the UI into dist/
 ```
 
-> On Node 17+ the webpack 4 build needs the legacy OpenSSL provider. If `npm run build`
-> fails with `digital envelope routines::unsupported`, set `NODE_OPTIONS` first:
-> - bash:        `NODE_OPTIONS=--openssl-legacy-provider npm run build`
-> - PowerShell:  `$env:NODE_OPTIONS="--openssl-legacy-provider"; npm run build`
+> The webpack 4 build needs Node's legacy OpenSSL provider (Node 17+). This is configured
+> automatically in `.npmrc` (`node-options=--openssl-legacy-provider`), so `npm run build`
+> works as-is — no environment variable needed.
 
 ## Running
 
