@@ -8,7 +8,7 @@ Development was originally sponsored by the [ECMWF Summer of Weather Code (ESoWC
 
 ecPoint-Calibrate runs as two local processes, optionally wrapped in an Electron desktop window:
 
-- **Backend** — a Flask REST API (`core/`, Python) on port **8888**. GRIB and geopoints I/O is handled by `earthkit-data` / `earthkit-geo` (which bundle the eccodes engine via pip wheels), and maps are drawn with `earthkit-maps`. No conda or Metview required — a plain virtualenv works.
+- **Backend** — a Flask REST API (`core/`, Python) on port **8888**. GRIB and geopoints I/O is handled by `earthkit-data` / `earthkit-geo` (which bundle the eccodes engine via pip wheels), and maps are drawn with `earthkit-maps`. A plain virtualenv is all that's required.
 - **Frontend** — a React/Redux UI (`ui/`) bundled by webpack and served by a small Express proxy (`web-server.js`) on port **3000**, which forwards API calls to the backend.
 - **Desktop** — `electron.js` opens the frontend in a native window; this is the entry point for the packaged executables.
 

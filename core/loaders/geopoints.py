@@ -1,12 +1,11 @@
 """Geopoints loader.
 
-Replaces the previous Metview-backed reader. A ``.geo`` file is parsed into a
-lightweight numpy-backed :class:`Geopoints` value object that exposes only the
-surface the rest of the codebase relies on (length/truthiness, latitudes,
-longitudes, values, boolean masking, filtering and element-wise arithmetic
-against another Geopoints of equal length).
+A ``.geo`` file is parsed into a lightweight numpy-backed :class:`Geopoints`
+value object that exposes only the surface the rest of the codebase relies on
+(length/truthiness, latitudes, longitudes, values, boolean masking, filtering
+and element-wise arithmetic against another Geopoints of equal length).
 
-Two on-disk variants are supported, matching the original Metview behaviour:
+Two on-disk ``.geo`` variants are supported:
 
 * **Traditional** ``#GEO`` format with positional columns
   ``lat lon height date time value`` (whitespace separated). The value is the

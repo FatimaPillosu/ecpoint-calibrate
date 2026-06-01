@@ -145,8 +145,7 @@ def test_nearest_gridpoint_new_geofile_format():
     ).all()
     # First obs point (lat=70.68, lon=127.4) sits exactly halfway between grid
     # longitudes 127.2 and 127.6 at the same latitude — the two candidate grid
-    # points are equidistant to the millimetre (8814.415 m). Metview's nearest
-    # picked 127.2 (value 0.25); earthkit-geo's GeoKDTree picks 127.6 (value 0.0).
-    # This is an arbitrary tie-break, not a regression; the other three points
-    # match Metview exactly.
+    # points are equidistant to the millimetre (8814.415 m). earthkit-geo's
+    # GeoKDTree picks 127.6 (value 0.0); the other candidate (127.2) has value
+    # 0.25. This is an arbitrary tie-break, not a regression.
     assert geopoints_loader.get_values(geopoints_out).tolist() == [0.0, 24.25, 0, 17.5]

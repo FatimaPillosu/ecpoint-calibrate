@@ -7,7 +7,7 @@ ecPoint-Calibrate v1.0.1 — A web-based GUI for conditional verification and ca
 - **Backend**: Flask REST API (Python, port 8888) in `core/`
 - **Frontend**: React/Redux with Semantic UI (port 3000) in `ui/`
 - **Web server**: Express.js proxy in `web-server.js`
-- **Build**: `NODE_OPTIONS=--openssl-legacy-provider npx webpack --mode development`
+- **Build**: `npm run build` (the legacy OpenSSL provider is configured in `.npmrc`)
 
 ## Key Files
 - `core/api.py` — Flask endpoints
@@ -17,12 +17,10 @@ ecPoint-Calibrate v1.0.1 — A web-based GUI for conditional verification and ca
 - `ui/workflows/C/2/postprocessing/component.js` — Post-processing page layout
 
 ## Evaluation Files
-**IMPORTANT**: Before modifying any code in `core/postprocessors/decision_tree.py` or any WT code generation logic, read ALL evaluation files in `.claude/evals/`. These document known bugs, their root causes, correct behavior, and test cases. Always verify your changes against these test cases.
-
-### Eval directory: `.claude/evals/`
-- `wt-code-generation.md` — WT code digit assignment when predictor levels are skipped
-- `wt-export-evaluation-mismatch.md` — Exported WT histograms don't match in-app (dual code path bug)
-- `wt-code-renumbering-after-leftmost-merge.md` — WT codes not renumbered after leftmost merge
+**IMPORTANT**: Before modifying `core/postprocessors/decision_tree.py` or any WT
+code-generation / observation-evaluation logic, read
+`.claude/evals/decision-tree-wt-codes.md` for the root-cause rationale, then run the
+regression tests in `tests/unit/test_decision_tree.py` that lock in each behaviour.
 
 ## Brand Guidelines
 - **Headings**: Poppins (500-700 weight)
@@ -34,4 +32,4 @@ ecPoint-Calibrate v1.0.1 — A web-based GUI for conditional verification and ca
 ## Environment
 - API keys stored in `.env` (never commit)
 - Windows development machine
-- Python 3.14, Node.js
+- Python 3.11, Node.js

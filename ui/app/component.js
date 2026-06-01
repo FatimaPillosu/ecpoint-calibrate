@@ -93,7 +93,7 @@ class App extends Component {
 
       {/* Footer pinned to bottom-left */}
       <div className="homepage-footer">
-        PYTHON FOR DATA SCIENCE (NUMPY, PANDAS, MATPLOTLIB, SCIPY)&nbsp;&nbsp;|&nbsp;&nbsp;EARTHKIT&nbsp;&nbsp;|&nbsp;&nbsp;FLASK&nbsp;&nbsp;|&nbsp;&nbsp;GRIB&nbsp;&nbsp;|&nbsp;&nbsp;PARQUET&nbsp;&nbsp;|&nbsp;&nbsp;REACT&nbsp;&nbsp;|&nbsp;&nbsp;DOCKER
+        PYTHON FOR DATA SCIENCE (NUMPY, PANDAS, MATPLOTLIB, SCIPY)&nbsp;&nbsp;|&nbsp;&nbsp;EARTHKIT&nbsp;&nbsp;|&nbsp;&nbsp;FLASK&nbsp;&nbsp;|&nbsp;&nbsp;GRIB&nbsp;&nbsp;|&nbsp;&nbsp;PARQUET&nbsp;&nbsp;|&nbsp;&nbsp;REACT
         <div className="homepage-footer-license">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '5px', verticalAlign: 'middle', position: 'relative', top: '-1px' }}>
             <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/>
@@ -124,7 +124,7 @@ class App extends Component {
               </div>
               <h3 className="workflow-step-title">Load Model and Observed Data</h3>
               <p className="workflow-step-desc">
-                Import NWP model outputs (GRIB - NetCDF coming soon) alongside point
+                Import NWP model outputs (GRIB) alongside point
                 observations from weather stations worldwide.
               </p>
             </div>

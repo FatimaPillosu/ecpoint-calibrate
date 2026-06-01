@@ -17,7 +17,7 @@ class Parameters extends Component {
         </Item.Header>
 
         <Item.Description>
-          <Grid columns={2}>
+          <Grid columns={1}>
             <Grid.Column>
               <Radio
                 label="GRIB"
@@ -29,21 +29,6 @@ class Parameters extends Component {
               <Popup
                 trigger={<Icon name="info circle" />}
                 content="General Regularly-distributed Information in Binary form"
-                size="tiny"
-              />
-            </Grid.Column>
-            <Grid.Column>
-              <Radio
-                label="NetCDF"
-                value="netcdf"
-                checked={this.props.parameters.modelType === 'netcdf'}
-                onChange={() => this.props.onModelTypeChange('netcdf')}
-                disabled={true}
-              />
-              &nbsp;&nbsp;&nbsp;
-              <Popup
-                trigger={<Icon name="info circle" />}
-                content="NETwork Common Data Form"
                 size="tiny"
               />
             </Grid.Column>

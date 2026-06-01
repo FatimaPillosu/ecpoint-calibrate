@@ -1,9 +1,8 @@
 """GRIB fieldset loader.
 
-Replaces the previous Metview-backed wrapper. GRIB messages are read with
-earthkit-data; field values are held as numpy arrays so that arithmetic,
-reductions and nearest-gridpoint extraction are plain numpy / earthkit-geo
-operations rather than Metview macro calls.
+GRIB messages are read with earthkit-data; field values are held as numpy
+arrays so that arithmetic, reductions and nearest-gridpoint extraction are
+plain numpy / earthkit-geo operations.
 
 A :class:`Fieldset` wraps a single earthkit ``GribField`` (kept for grid
 geometry and metadata) plus an optional numpy values override produced by

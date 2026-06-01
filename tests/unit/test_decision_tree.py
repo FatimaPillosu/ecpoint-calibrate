@@ -2,7 +2,7 @@ import numpy as np
 import pandas
 import pytest
 
-from core.postprocessors.decision_tree import DecisionTree
+from core.postprocessors.decision_tree import DecisionTree, WeatherType
 from tests.unit.utils import strip_node_shape
 
 inf = float("inf")
@@ -749,3 +749,84 @@ def test_decision_tree_construction(breakpoints):
     }
 
     assert strip_node_shape(dt.tree.json) == expected
+
+
+def test_leaf_codes_skip_level_assigns_zero_digit():
+    """Regression for WT-CODE-SKIP-LEVEL: a row that is fully unbounded at a
+    predictor must get digit 0 there, even when it shares its low value (-inf)
+    with a bounded sibling. (See .claude/evals/decision-tree-wt-codes.md.)
+    """
+    low = pandas.DataFrame({"A_thrL": [-inf, -inf, 70.0]})
+    high = pandas.DataFrame({"A_thrH": [inf, 70.0, inf]})
+    dt = DecisionTree(
+        threshold_low=low, threshold_high=high, ranges={"A": ["-inf", "inf"]}
+    )
+
+    assert dt._leaf_codes_direct() == ["0", "1", "2"]
+
+
+def test_leaf_codes_renumbered_within_sibling_group_after_leftmost_merge():
+    """Regression for WT-CODE-RENUMBER: after the leftmost WT in a sibling group
+    is merged, survivors are renumbered sequentially within their own group. Here
+    B under A1 has been merged to 2 bins while B under A2 keeps 3 bins, so digits
+    must restart per group (…12, not …13). The pre-fix global-rank lookup across
+    groups produced "13". (See .claude/evals/decision-tree-wt-codes.md.)
+    """
+    low = pandas.DataFrame(
+        {
+            "A_thrL": [-inf, -inf, 0.25, 0.25, 0.25],
+            "B_thrL": [-inf, 275.0, -inf, 70.0, 275.0],
+        }
+    )
+    high = pandas.DataFrame(
+        {
+            "A_thrH": [0.25, 0.25, inf, inf, inf],
+            "B_thrH": [275.0, inf, 70.0, 275.0, inf],
+        }
+    )
+    dt = DecisionTree(
+        threshold_low=low,
+        threshold_high=high,
+        ranges={"A": ["-inf", "inf"], "B": ["-inf", "inf"]},
+    )
+
+    assert dt._leaf_codes_direct() == ["11", "12", "21", "22", "23"]
+    assert dt.leaf_codes == ["11", "12", "21", "22", "23"]
+
+
+class _FakeLoader:
+    """Minimal BasePointDataReader stand-in (cheaper=False) for evaluate()."""
+
+    def __init__(self, dataframe):
+        self.dataframe = dataframe
+        self.cheaper = False
+        self.error_type = None
+
+
+def test_weathertype_evaluate_counts_merged_wt_independently():
+    """Regression for WT-EXPORT-MISMATCH: WeatherType.evaluate() filters each
+    predictor condition independently, so a merged/wide-range WT counts the right
+    observations. The replaced evaluate_all() assumed a Cartesian-product matrix
+    and mis-binned observations after pruning, so exported histograms diverged
+    from the in-app ones. (See .claude/evals/decision-tree-wt-codes.md.)
+    """
+    df = pandas.DataFrame(
+        {
+            "A": [0.1, 0.3, 0.3, 0.5, 0.9, 1.0, 0.2, 0.4, 0.6, 0.8],
+            "B": [10, 50, 100, 200, 300, 80, 90, 280, 30, 500],
+            "OBS": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        }
+    )
+    labels = ["A_thrL", "A_thrH", "B_thrL", "B_thrH"]
+    series = pandas.Series(dict(zip(labels, [0.25, inf, 70.0, 275.0])))
+    wt = WeatherType(
+        thrL=series.iloc[::2],
+        thrH=series.iloc[1::2],
+        thrL_labels=labels[::2],
+        thrH_labels=labels[1::2],
+    )
+
+    out, _ = wt.evaluate("OBS", loader=_FakeLoader(df))
+
+    # A in [0.25, inf) AND B in [70, 275)  ->  observations 3, 4, 6
+    assert sorted(out["OBS"].tolist()) == [3, 4, 6]

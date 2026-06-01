@@ -27,7 +27,7 @@ class Parameters(object):
     # output file format
     out_format = attr.ib(converter=str)
 
-    # Model type: {grib, netcdf}
+    # Model type: grib
     model_type = attr.ib(converter=str)
 
     # interval between model runs (in hours)
