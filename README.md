@@ -1,136 +1,91 @@
 # ecPoint-Calibrate
 
-![Core unit tests](https://github.com/esowc/ecPoint-Calibrate/workflows/Core%20unit%20tests/badge.svg)
-![Release Core](https://github.com/esowc/ecPoint-Calibrate/workflows/Release%20Core/badge.svg)
-![Release Electron](https://github.com/esowc/ecPoint-Calibrate/workflows/Release%20Electron/badge.svg)
-[![codecov](https://codecov.io/gh/esowc/ecPoint-Calibrate/branch/master/graph/badge.svg?token=x1SGIykSpy)](https://codecov.io/gh/esowc/ecPoint-Calibrate)
-[![made-with-python](https://img.shields.io/badge/Made%20with-Python3.8-1f425f.svg)](https://www.python.org/)
+ecPoint-Calibrate uses conditional verification to compare numerical weather prediction (NWP) model outputs against point observations, in order to anticipate sub-grid variability and identify biases at grid scale. It provides a user-friendly environment to post-process NWP parameters (precipitation, wind, temperature, etc.) and produce calibrated, probabilistic products for any location worldwide, up to the medium range.
 
-ecPoint-Calibrate is a software that uses conditional verification tools to compare numerical weather prediction (NWP) model outputs against point observations and, in this way, anticipate sub-grid variability and identify biases at grid scale.
-It provides a dynamic and user-friendly environment to post-process NWP model parameters (such as precipitation, wind, temperature, etc.) and produce probabilistic products for geographical locations (everywhere in the world, and up to medium-range forecasts).
+Development was originally sponsored by the [ECMWF Summer of Weather Code (ESoWC)](https://esowc.ecmwf.int/) programme at [ECMWF](https://www.ecmwf.int).
 
-The development of this project was sponsored by the project "ECMWF Summer of Weather Code (ESoWC)"
-[@esowc_ecmwf](https://twitter.com/esowc_ecmwf?lang=en)
-[ECMWF](https://www.ecmwf.int).
+## Architecture
 
-## Build with Docker
+ecPoint-Calibrate runs as two local processes, optionally wrapped in an Electron desktop window:
 
-```
-docker build -f Dockerfile.core -t ecmwf/ecpoint-calibrate-core:dev .
-```
+- **Backend** — a Flask REST API (`core/`, Python) on port **8888**. GRIB and geopoints I/O is handled by `earthkit-data` / `earthkit-geo` (which bundle the eccodes engine via pip wheels), and maps are drawn with `earthkit-maps`. No conda or Metview required — a plain virtualenv works.
+- **Frontend** — a React/Redux UI (`ui/`) bundled by webpack and served by a small Express proxy (`web-server.js`) on port **3000**, which forwards API calls to the backend.
+- **Desktop** — `electron.js` opens the frontend in a native window; this is the entry point for the packaged executables.
 
-## Deploy new versions of the Docker containers
+## Prerequisites
 
-```
-./deploy.sh
-```
+- Python **3.11**
+- Node.js (LTS) and npm
 
-## Create a production AppImage
+## Setup
 
-```
-yarn dist
+### 1. Python backend
+
+```bash
+python -m venv .venv
+# activate:  Windows -> .venv\Scripts\activate   |   macOS/Linux -> source .venv/bin/activate
+pip install -e .          # installs the dependencies declared in pyproject.toml
 ```
 
-The appimage won't work on modern machines without manually adding the `--no-sandbox` electron
-option and re-packaging.
+### 2. Frontend
 
-### Install `appimagetool`
-
-```
-sudo wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
-sudo chmod +x /usr/local/bin/appimagetool
+```bash
+npm install
+npm run build             # bundles the UI into dist/
 ```
 
-### Repackage the AppImage
+> On Node 17+ the webpack 4 build needs the legacy OpenSSL provider. If `npm run build`
+> fails with `digital envelope routines::unsupported`, set `NODE_OPTIONS` first:
+> - bash:        `NODE_OPTIONS=--openssl-legacy-provider npm run build`
+> - PowerShell:  `$env:NODE_OPTIONS="--openssl-legacy-provider"; npm run build`
 
-```
-cd pkg
-./ecPoint-Calibrate-0.30.0.AppImage --appimage-extract
-```
+## Running
 
-This will extract the image into the `squashfs-root` directory.
-Open `squashfs-root/AppRun` and change the `exec` lines to have the `--no-sandbox` argument.
-e.g. `exec "$BIN" --no-sandbox`
+Start both servers and open <http://localhost:3000>:
 
-Then repackage:
-```
-appimagetool squashfs-root ecPoint-Calibrate-0.30.0.AppImage
+```bash
+start.bat       # Windows
+./start.sh      # macOS / Linux
 ```
 
-## Python Backend
+Each script launches the Flask backend (`python -m core.api`, port 8888) and the Express
+frontend (`node web-server.js`, port 3000). Make sure the virtualenv from step 1 is active
+(or, on Windows, that `.venv` exists — `start.bat` uses it directly).
 
-GRIB and geopoints I/O is handled by `earthkit-data` / `earthkit-geo` (which
-bundle the eccodes engine via pip wheels), so the backend no longer requires
-`metview-batch` or a conda environment — a plain virtualenv works.
+## Packaging desktop executables
 
-### Creating the environment
+`electron-builder` produces a one-click executable per platform:
 
-```
-python3.11 -m venv .venv
-.venv/bin/pip install -e .          # or: poetry install
-```
-
-On Windows:
-
-```
-py -3.11 -m venv .venv
-.venv\Scripts\pip install -e .
+```bash
+npm run dist:win      # Windows portable .exe
+npm run dist:linux    # Linux AppImage
+npm run dist:mac      # macOS .dmg
 ```
 
-> Note: the conda lock files (`environment.yml`, `conda-linux-64.lock`) and the
-> `poetry.lock` / `Pipfile.lock` files predate the earthkit migration and still
-> reference metview. Regenerate them (`poetry lock`, `conda-lock`) before relying
-> on them; they are no longer needed for a basic pip/venv install.
+The GitHub Actions workflow `.github/workflows/build-electron.yml` builds all three on a
+`v*` tag push (or manual dispatch) and uploads the artifacts.
 
-### Activating the environment
+> Note: these package the Electron/UI layer. Bundling the Python backend into the
+> executable so it runs fully standalone is still in progress.
 
-```
-conda activate ecpoint_calibrate_env
-```
+## Tests
 
-### Updating the environment
-
-#### Poetry (strongly preferred)
-
-Installing a new package with poetry will update the poetry lockfile.
-
-```
-poetry install $DEP
+```bash
+pytest          # Python backend
+npm test        # frontend (Jest)
 ```
 
-#### Conda
-
-You should very rarely need to add a new conda dep.
+## Project layout
 
 ```
-conda-lock -k explicit --conda mamba
-mamba update --file conda-linux-64.lock
-poetry update
+core/            Flask backend — API, loaders, processor, post-processors
+ui/              React/Redux frontend
+web-server.js    Express server + proxy to the Flask backend
+electron.js      Electron desktop entry point
+pyproject.toml   Python dependencies (single source of truth)
+package.json     Node dependencies and build/run scripts
 ```
 
+## License
 
-### Run tests
-
-First activate the conda env, then run `pytest`.
-
-## Electron Frontend
-
-You'll need node v 14.5.0.
-
-### Installing deps
-
-```
-yarn
-```
-
-### Run the app
-
-```
-yarn start
-```
-
-### Run tests
-
-```
-npm run test
-```
+GPL-3.0 — see [LICENSE](LICENSE).

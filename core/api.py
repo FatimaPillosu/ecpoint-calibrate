@@ -26,7 +26,6 @@ import numpy
 import pandas
 from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
-from healthcheck import EnvironmentDump, HealthCheck
 
 from core.loaders import geopoints as geopoints_loader
 from core.loaders import load_point_data_by_path
@@ -40,10 +39,6 @@ from core.utils import inf, sanitize_path, wrap_title
 
 app = Flask(__name__)
 CORS(app)
-
-# wrap the flask app and give a heathcheck url
-health = HealthCheck(app, "/healthcheck")
-envdump = EnvironmentDump(app, "/environment")
 
 
 @app.errorhandler(Exception)

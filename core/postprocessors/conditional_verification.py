@@ -1,42 +1,44 @@
 import base64
-import os
 from io import BytesIO
-from tempfile import NamedTemporaryFile
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import matplotlib.cm as cm
 import cartopy.crs as ccrs
-import cartopy.feature as cfeature
 import numpy as np
+import earthkit.maps as ekm
 
 
 def _scatter_map(lons, lats, values, bins, colors, title_lines, code):
-    """Create a scatter plot on a map and return a base64 PNG."""
+    """Draw the observation points on an earthkit-maps global chart and return a base64 PNG."""
     norm = mcolors.BoundaryNorm(bins, len(colors))
     cmap = mcolors.ListedColormap(colors)
+    style = ekm.Style(colors=colors, levels=bins, normalize=False)
 
-    fig, ax = plt.subplots(
-        figsize=(10, 6), subplot_kw={"projection": ccrs.Mollweide()}
+    chart = ekm.Chart(crs=ccrs.Mollweide())
+    chart.scatter(values, x=lons, y=lats, style=style, s=1)
+    chart.coastlines(linewidth=1, color="#333333")
+    chart.borders(linewidth=0.5, color="#666666")
+
+    geo_ax = chart.fig.get_axes()[0]
+    geo_ax.set_global()
+
+    # earthkit-maps' own legend() expects xarray-style metadata, so build the
+    # binned colorbar directly from the same levels/colors the style uses.
+    mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+    mappable.set_array([])
+    cbar = chart.fig.colorbar(
+        mappable, ax=geo_ax, orientation="horizontal", pad=0.05, shrink=0.7
     )
-    ax.set_global()
-    ax.add_feature(cfeature.COASTLINE, linewidth=1, edgecolor="#333333")
-    ax.add_feature(cfeature.BORDERS, linewidth=0.5, edgecolor="#666666")
-
-    sc = ax.scatter(
-        lons, lats, c=values, cmap=cmap, norm=norm,
-        s=1, marker="o", transform=ccrs.PlateCarree(),
-    )
-
-    cbar = plt.colorbar(sc, ax=ax, orientation="horizontal", pad=0.05, shrink=0.7)
     cbar.ax.tick_params(labelsize=7)
 
-    ax.set_title("\n".join(title_lines), fontsize=10)
+    chart.title("\n".join(title_lines))
 
     buf = BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", dpi=150)
-    plt.close(fig)
+    chart.fig.savefig(buf, format="png", bbox_inches="tight", dpi=150)
+    plt.close(chart.fig)
     buf.seek(0)
     return {"image": base64.b64encode(buf.read()).decode("utf-8")}
 

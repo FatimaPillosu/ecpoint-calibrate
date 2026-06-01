@@ -16,8 +16,6 @@ const proxyPaths = [
   '/postprocessing',
   '/get-predictor-metadata',
   '/get-pdt-metadata',
-  '/healthcheck',
-  '/environment',
 ]
 
 proxyPaths.forEach((apiPath) => {

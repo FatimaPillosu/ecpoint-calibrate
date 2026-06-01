@@ -51,17 +51,6 @@ export const writeFileContent = async (filePath, content) => {
 }
 
 /**
- * Read the tail of a log file.
- * @param {string} logPath - defaults to /var/tmp/ecpoint.logs
- * @param {number} lines - number of tail lines
- * @returns {Promise<{content, path, totalLines}>}
- */
-export const readLogs = async (logPath, lines) => {
-  const { data } = await api.post('/api/logs', { path: logPath, lines })
-  return data
-}
-
-/**
  * Get the app version from the server.
  * @returns {Promise<string>}
  */
