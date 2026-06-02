@@ -240,3 +240,7 @@ ecPoint_Calibrate_GMD_Paper_Structure.docx
 
 # Large test data files
 tests/sample_output/
+tests/data/ecmwf/alfa.parquet
+
+# Research manuscript (kept in-tree for now; not part of the software)
+paper/

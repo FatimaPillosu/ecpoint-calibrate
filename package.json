@@ -28,7 +28,7 @@
   "author": "Anirudha Bose <anirudha.bose@alumni.cern>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/esowc/ecPoint-Calibrate.git"
+    "url": "https://github.com/FatimaPillosu/ecpoint-calibrate.git"
   },
   "license": "Apache-2.0",
   "dependencies": {
