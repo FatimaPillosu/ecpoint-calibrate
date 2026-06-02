@@ -48,6 +48,13 @@ def handle_error(e):
     return traceback.format_exc(), code
 
 
+@app.route("/healthcheck", methods=("GET",))
+def healthcheck():
+    """Lightweight readiness probe used by the desktop launcher to detect when
+    the backend is accepting requests before opening the UI window."""
+    return jsonify({"status": "ok"})
+
+
 is_computation_running = False
 
 

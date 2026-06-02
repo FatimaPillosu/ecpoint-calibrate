@@ -21,6 +21,10 @@ ecPoint-Calibrate runs as two local processes, optionally wrapped in an Electron
 
 ## Setup
 
+The fastest path is the one-time setup script — **`setup.bat`** (Windows) or
+**`bash setup.sh`** (macOS/Linux) — which runs everything below automatically. The
+manual steps, if you prefer:
+
 ### 1. Python backend
 
 ```bash
@@ -53,21 +57,19 @@ Each script launches the Flask backend (`python -m core.api`, port 8888) and the
 frontend (`node web-server.js`, port 3000). Make sure the virtualenv from step 1 is active
 (or, on Windows, that `.venv` exists — `start.bat` uses it directly).
 
-## Packaging desktop executables
+## Sharing the app (no installer)
 
-`electron-builder` produces a one-click executable per platform:
+There is no packaged installer — ecPoint-Calibrate runs from source. This avoids
+code-signing/notarization requirements and works the same on Windows, macOS, and Linux.
+To share it, people download the repository (**Code → Download ZIP**, or `git clone`)
+and run two scripts:
 
-```bash
-npm run dist:win      # Windows portable .exe
-npm run dist:linux    # Linux AppImage
-npm run dist:mac      # macOS .dmg
-```
+1. **Setup (once):** `setup.bat` (Windows) or `bash setup.sh` (macOS/Linux) — checks for
+   Python 3.11 and Node.js, creates `.venv`, installs all dependencies, and builds the UI.
+2. **Run:** `start.bat` (Windows) or `bash start.sh` (macOS/Linux) — starts the backend
+   and frontend and opens the app at <http://localhost:3000>.
 
-The GitHub Actions workflow `.github/workflows/build-electron.yml` builds all three on a
-`v*` tag push (or manual dispatch) and uploads the artifacts.
-
-> Note: these package the Electron/UI layer. Bundling the Python backend into the
-> executable so it runs fully standalone is still in progress.
+The only things a user installs themselves are **Python 3.11** and **Node.js**.
 
 ## Tests
 
@@ -82,7 +84,8 @@ npm test        # frontend (Jest)
 core/            Flask backend — API, loaders, processor, post-processors
 ui/              React/Redux frontend
 web-server.js    Express server + proxy to the Flask backend
-electron.js      Electron desktop entry point
+setup.bat/.sh    One-time environment setup (venv + deps + UI build)
+start.bat/.sh    Start the backend + frontend and open the app
 pyproject.toml   Python dependencies (single source of truth)
-package.json     Node dependencies and build/run scripts
+package.json     Node dependencies and run scripts
 ```

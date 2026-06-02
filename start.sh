@@ -1,46 +1,43 @@
-#!/bin/bash
-# ecPoint-Calibrate Web App Startup Script
-# Starts both the Flask backend and Express frontend server
+#!/usr/bin/env bash
+# ecPoint-Calibrate - start the app (macOS / Linux)
+# Starts the Flask backend and the Express frontend, then opens the browser.
 
 set -e
 
-PYTHON="${PYTHON:-python}"
-NODE="${NODE:-node}"
+if [ ! -x ".venv/bin/python" ]; then
+  echo "[ERROR] No Python environment found. Run 'bash setup.sh' first."
+  exit 1
+fi
 
-echo "=== ecPoint-Calibrate Web App ==="
-echo ""
+echo "=== ecPoint-Calibrate ==="
+echo
 
-# Start Flask backend
 echo "Starting Flask backend on port 8888..."
-"$PYTHON" -m core.api &
+.venv/bin/python -m core.api &
 BACKEND_PID=$!
 
-# Wait a moment for Flask to start
-sleep 2
-
-# Start Express web server
 echo "Starting Express frontend on port 3000..."
-"$NODE" web-server.js &
+node web-server.js &
 FRONTEND_PID=$!
 
-echo ""
-echo "ecPoint-Calibrate is running at http://localhost:3000"
-echo "Flask backend is running at http://localhost:8888"
-echo ""
-echo "Press Ctrl+C to stop both servers."
+# Open the browser once the servers have had a moment to start
+( sleep 6
+  if command -v xdg-open >/dev/null 2>&1; then xdg-open http://localhost:3000
+  elif command -v open >/dev/null 2>&1; then open http://localhost:3000
+  fi ) >/dev/null 2>&1 &
 
-# Trap Ctrl+C and kill both processes
+echo
+echo "ecPoint-Calibrate is starting at http://localhost:3000"
+echo "Press Ctrl+C to stop."
+
 cleanup() {
-  echo ""
+  echo
   echo "Shutting down..."
-  kill $BACKEND_PID 2>/dev/null
-  kill $FRONTEND_PID 2>/dev/null
-  wait $BACKEND_PID 2>/dev/null
-  wait $FRONTEND_PID 2>/dev/null
+  kill "$BACKEND_PID" 2>/dev/null || true
+  kill "$FRONTEND_PID" 2>/dev/null || true
+  wait "$BACKEND_PID" 2>/dev/null || true
+  wait "$FRONTEND_PID" 2>/dev/null || true
   echo "Done."
 }
-
 trap cleanup EXIT INT TERM
-
-# Wait for either process to exit
 wait
