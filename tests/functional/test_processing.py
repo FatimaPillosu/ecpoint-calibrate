@@ -9,7 +9,7 @@ def test_alfa(client, alfa_cassette, alfa_loader, fmt, tmp_path):
     path = tmp_path / f"pdt.{fmt.lower()}"
     request = alfa_cassette(output_path=str(path), fmt=fmt)
     response = client.post("/computations/start", json=request)
-    assert response.status_code == 200
+    assert response.status_code == 200, response.get_data(as_text=True)
 
     got_loader = load_point_data_by_path(path=str(path))
     assert got_loader.error_type == ErrorType.FER
