@@ -1,6 +1,6 @@
 # ecPoint-Calibrate
 
-![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/FatimaPillosu/ecpoint-calibrate/main/.github/badges/coverage.json)
+![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/FatimaPillosu/ecpoint-calibrate/main/.github/badges/coverage.json) ![license](https://img.shields.io/github/license/FatimaPillosu/ecpoint-calibrate)
 
 ecPoint-Calibrate uses conditional verification to compare numerical weather prediction (NWP) model outputs against point observations, in order to anticipate sub-grid variability and identify biases at grid scale. It provides a user-friendly environment to post-process NWP parameters (precipitation, wind, temperature, etc.) and produce calibrated, probabilistic products for any location worldwide, up to the medium range.
 
@@ -86,7 +86,3 @@ electron.js      Electron desktop entry point
 pyproject.toml   Python dependencies (single source of truth)
 package.json     Node dependencies and build/run scripts
 ```
-
-## License
-
-GPL-3.0 — see [LICENSE](LICENSE).

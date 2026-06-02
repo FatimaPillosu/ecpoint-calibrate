@@ -3,7 +3,7 @@ name = "ecpoint-calibrate"
 version = "1.0.1"
 description = "Web GUI for conditional verification and calibration of NWP model outputs"
 authors = ["Fatima Pillosu <fatima.pillosu@gmail.com>"]
-license = "GPL-3.0"
+license = "Apache-2.0"
 readme = "README.md"
 packages = [{include = "core"}]
 
