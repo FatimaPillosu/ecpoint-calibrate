@@ -45,8 +45,7 @@ CORS(app)
 def handle_error(e):
     code = getattr(e, "code", 500)
 
-    tb = traceback.format_exception_only(type(e), e) or [str(e)]
-    return "\n".join(tb), code
+    return traceback.format_exc(), code
 
 
 is_computation_running = False
