@@ -47,7 +47,7 @@ class App extends Component {
               <span className="homepage-brand-ecpoint">ECPOINT</span>
               <span className="homepage-brand-calibrate">CALIBRATE</span>
             </div>
-            <span className="homepage-brand-version">V 1.0.1</span>
+            <span className="homepage-brand-version">V 2.0.0</span>
           </div>
 
           {/* Main heading */}

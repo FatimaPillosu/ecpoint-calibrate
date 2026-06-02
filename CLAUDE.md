@@ -1,7 +1,7 @@
 # Claude Code Project Instructions
 
 ## Project
-ecPoint-Calibrate v1.0.1 — A web-based GUI for conditional verification and calibration of NWP model outputs.
+ecPoint-Calibrate v2.0.0 — A web-based GUI for conditional verification and calibration of NWP model outputs.
 
 ## Architecture
 - **Backend**: Flask REST API (Python, port 8888) in `core/`

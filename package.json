@@ -1,6 +1,6 @@
 {
   "name": "ecpoint-calibrate",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "Web GUI for ecPoint-Calibrate powered by Express and React",
   "engines": {
     "node": ">=18.0.0"

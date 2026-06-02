@@ -27,7 +27,7 @@ export default class Header extends Component {
   componentDidMount() {
     getAppVersion()
       .then(version => this.setState({ version }))
-      .catch(() => this.setState({ version: '1.0.1' }))
+      .catch(() => this.setState({ version: '2.0.0' }))
   }
 
   openFileBrowser = (mode, action, filter, defaultFileName) => {
