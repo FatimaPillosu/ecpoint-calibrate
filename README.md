@@ -1,6 +1,6 @@
 # ecPoint-Calibrate
 
-![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/FatimaPillosu/ecpoint-calibrate/main/.github/badges/coverage.json) ![license](https://img.shields.io/github/license/FatimaPillosu/ecpoint-calibrate?color=orange) ![release](https://img.shields.io/github/v/release/FatimaPillosu/ecpoint-calibrate?color=8e44ad)
+![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/FatimaPillosu/ecpoint-calibrate/main/.github/badges/coverage.json) ![license](https://img.shields.io/github/license/FatimaPillosu/ecpoint-calibrate?color=orange) ![release](https://img.shields.io/badge/release-2.0.0-8e44ad)
 
 ecPoint-Calibrate uses conditional verification to compare numerical weather prediction (NWP) model outputs against point observations, in order to anticipate sub-grid variability and identify biases at grid scale. It provides a user-friendly environment to post-process NWP outputs (e.g. precipitation and temperature) and produce calibrated, probabilistic point-scale forecasts for any location worldwide.
 
