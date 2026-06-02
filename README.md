@@ -81,6 +81,18 @@ bash start.sh
 If `python3.11` reports *"command not found"*, it isn't on your PATH yet — install it via
 `brew install python@3.11` or from [python.org](https://www.python.org/downloads/).
 
+**`npm error code ETARGET` — `No matching version found for prop-types@>=16`**
+
+A UI dependency (`react-datasheet`) declares an outdated peer dependency that strict modern
+npm (v7+) rejects. The repo's `.npmrc` already sets `legacy-peer-deps=true`, so a fresh
+`npm install` works — but on an older checkout, or if you see this error, install with:
+
+```bash
+npm install --legacy-peer-deps
+```
+
+The `npm warn ERESOLVE` lines printed during a normal install are harmless.
+
 ## Sharing the app (no installer)
 
 There is no packaged installer — ecPoint-Calibrate runs from source. This avoids
