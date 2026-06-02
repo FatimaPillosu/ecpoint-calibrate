@@ -232,9 +232,8 @@ dist
 # Secrets
 .env
 
-# Claude Code config (keep the project eval docs under .claude/evals/)
-.claude/*
-!.claude/evals/
+# Claude Code config
+.claude/
 
 # Documents
 ecPoint_Calibrate_GMD_Paper_Structure.docx

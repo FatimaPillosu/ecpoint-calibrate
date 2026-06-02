@@ -16,11 +16,12 @@ ecPoint-Calibrate v1.0.1 — A web-based GUI for conditional verification and ca
 - `ui/workflows/C/2/breakpoints/` — Breakpoints table and merge logic
 - `ui/workflows/C/2/postprocessing/component.js` — Post-processing page layout
 
-## Evaluation Files
-**IMPORTANT**: Before modifying `core/postprocessors/decision_tree.py` or any WT
-code-generation / observation-evaluation logic, read
-`.claude/evals/decision-tree-wt-codes.md` for the root-cause rationale, then run the
-regression tests in `tests/unit/test_decision_tree.py` that lock in each behaviour.
+## Decision-tree safety net
+**IMPORTANT**: `core/postprocessors/decision_tree.py` (WT code generation and
+observation evaluation) is subtle and has been the source of every past bug. Before
+changing it, read and keep green the regression tests in
+`tests/unit/test_decision_tree.py` — each test's docstring documents the invariant it
+guards and the bug it prevents.
 
 ## Brand Guidelines
 - **Headings**: Poppins (500-700 weight)

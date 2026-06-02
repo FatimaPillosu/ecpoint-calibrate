@@ -756,6 +756,24 @@ def count_obs_per_wt():
 _pdt_cache = {}  # path -> (dataframe, timestamp)
 
 
+def _merge_range(survivor, donor, num_predictors, pred_labels, ranges):
+    """Expand survivor's range to cover donor's range at the deepest differing predictor."""
+    for p in range(num_predictors - 1, -1, -1):
+        lS, hS = survivor[p * 2], survivor[p * 2 + 1]
+        lD, hD = donor[p * 2], donor[p * 2 + 1]
+        if lS != lD or hS != hD:
+            survivor[p * 2] = min(lS, lD) if lS != float('-inf') and lD != float('-inf') else float('-inf')
+            survivor[p * 2 + 1] = max(hS, hD) if hS != float('inf') and hD != float('inf') else float('inf')
+            pred_name = pred_labels[p]
+            if pred_name in ranges:
+                field_min = float(ranges[pred_name][0])
+                field_max = float(ranges[pred_name][1])
+                if survivor[p * 2] <= field_min and survivor[p * 2 + 1] >= field_max:
+                    survivor[p * 2] = float('-inf')
+                    survivor[p * 2 + 1] = float('inf')
+            break
+
+
 @app.route("/postprocessing/eliminate-small-wts", methods=("POST",))
 def eliminate_small_wts():
     """
@@ -880,23 +898,6 @@ def eliminate_small_wts():
             return ()
         return tuple(row[: deepest * 2])
 
-    def merge_range(survivor, donor):
-        """Expand survivor's range to cover donor's range at the deepest differing predictor."""
-        for p in range(num_predictors - 1, -1, -1):
-            lS, hS = survivor[p * 2], survivor[p * 2 + 1]
-            lD, hD = donor[p * 2], donor[p * 2 + 1]
-            if lS != lD or hS != hD:
-                survivor[p * 2] = min(lS, lD) if lS != float('-inf') and lD != float('-inf') else float('-inf')
-                survivor[p * 2 + 1] = max(hS, hD) if hS != float('inf') and hD != float('inf') else float('inf')
-                pred_name = pred_labels[p]
-                if pred_name in ranges:
-                    field_min = float(ranges[pred_name][0])
-                    field_max = float(ranges[pred_name][1])
-                    if survivor[p * 2] <= field_min and survivor[p * 2 + 1] >= field_max:
-                        survivor[p * 2] = float('-inf')
-                        survivor[p * 2 + 1] = float('inf')
-                break
-
     # --- Optimization 1: Multi-round loop, eliminate ALL small WTs per group per round ---
     max_rounds = 100  # safety limit
     total_eliminated = 0
@@ -933,7 +934,7 @@ def eliminate_small_wts():
                     if counts[idx] < threshold:
                         # Merge into left neighbor
                         left_idx = local_members[i - 1]
-                        merge_range(matrix[left_idx], matrix[idx])
+                        _merge_range(matrix[left_idx], matrix[idx], num_predictors, pred_labels, ranges)
                         # Update count: sum both
                         counts[left_idx] = counts[left_idx] + counts[idx]
                         to_remove.add(idx)
@@ -946,7 +947,7 @@ def eliminate_small_wts():
                 leftmost_idx = local_members[0]
                 if counts[leftmost_idx] < threshold:
                     right_idx = local_members[1]
-                    merge_range(matrix[right_idx], matrix[leftmost_idx])
+                    _merge_range(matrix[right_idx], matrix[leftmost_idx], num_predictors, pred_labels, ranges)
                     counts[right_idx] = counts[right_idx] + counts[leftmost_idx]
                     to_remove.add(leftmost_idx)
 
