@@ -7,15 +7,35 @@ set -e
 echo "=== ecPoint-Calibrate setup ==="
 echo
 
-# 1. Check prerequisites
-command -v python3 >/dev/null 2>&1 || { echo "[ERROR] Python 3.11 not found. Install it from https://www.python.org/downloads/ and re-run."; exit 1; }
-command -v npm     >/dev/null 2>&1 || { echo "[ERROR] Node.js not found. Install the LTS from https://nodejs.org/ and re-run."; exit 1; }
+# 1. Find a Python >= 3.11.
+#    NOTE: macOS's built-in 'python3' is 3.9 (too old). Installing 3.11 adds a
+#    separate 'python3.11' command, so we search for a new-enough one explicitly.
+PYTHON=""
+for c in python3.13 python3.12 python3.11 python3 python; do
+  if command -v "$c" >/dev/null 2>&1; then
+    if "$c" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] >= (3, 11) else 1)' 2>/dev/null; then
+      PYTHON="$c"
+      break
+    fi
+  fi
+done
+if [ -z "$PYTHON" ]; then
+  echo "[ERROR] Python 3.11+ was not found."
+  echo "        (macOS's built-in 'python3' is 3.9, which is too old.)"
+  echo "        Install Python 3.11+ and re-run this script:"
+  echo "          - Homebrew:  brew install python@3.11"
+  echo "          - or download from https://www.python.org/downloads/"
+  exit 1
+fi
+echo "Using $PYTHON ($("$PYTHON" --version 2>&1))"
 
-# 2. Python backend: isolated environment + dependencies
+command -v npm >/dev/null 2>&1 || { echo "[ERROR] Node.js not found. Install the LTS from https://nodejs.org/ and re-run."; exit 1; }
+
+# 2. Python backend: fresh environment + dependencies
 echo "Creating the Python environment (.venv) and installing dependencies..."
 echo "This can take a few minutes the first time."
-python3 -m venv .venv
-./.venv/bin/python -m pip install --upgrade pip
+rm -rf .venv
+"$PYTHON" -m venv .venv
 ./.venv/bin/python -m pip install -e .
 
 # 3. Frontend: install Node packages and build the UI

@@ -8,16 +8,21 @@ Development was originally sponsored by the [ECMWF Summer of Weather Code (ESoWC
 
 ## Architecture
 
-ecPoint-Calibrate runs as two local processes, optionally wrapped in an Electron desktop window:
+ecPoint-Calibrate runs as two local processes:
 
 - **Backend** — a Flask REST API (`core/`, Python) on port **8888**. GRIB and geopoints I/O is handled by `earthkit-data` / `earthkit-geo` (which bundle the eccodes engine via pip wheels), and maps are drawn with `earthkit-maps`. A plain virtualenv is all that's required.
-- **Frontend** — a React/Redux UI (`ui/`) bundled by webpack and served by a small Express proxy (`web-server.js`) on port **3000**, which forwards API calls to the backend.
-- **Desktop** — `electron.js` opens the frontend in a native window; this is the entry point for the packaged executables.
+- **Frontend** — a React/Redux UI (`ui/`) bundled by webpack and served by a small Express proxy (`web-server.js`) on port **3000**, which forwards API calls to the backend. You use it in your browser at <http://localhost:3000>.
 
 ## Prerequisites
 
-- Python **3.11**
+- Python **3.11 or newer**
 - Node.js (LTS) and npm
+
+> **macOS:** the `python3` that ships with macOS is **3.9**, which is too old. Install a newer
+> one (`brew install python@3.11`, or from [python.org](https://www.python.org/downloads/)) — it
+> becomes available as the **`python3.11`** command and does *not* replace `python3`. `setup.sh`
+> finds it automatically; if you install by hand, use `python3.11` explicitly. See
+> [Troubleshooting](#troubleshooting) if you hit a Python-version error.
 
 ## Setup
 
@@ -56,6 +61,25 @@ start.bat       # Windows
 Each script launches the Flask backend (`python -m core.api`, port 8888) and the Express
 frontend (`node web-server.js`, port 3000). Make sure the virtualenv from step 1 is active
 (or, on Windows, that `.venv` exists — `start.bat` uses it directly).
+
+## Troubleshooting
+
+**macOS — `ERROR: Package 'ecpoint-calibrate' requires a different Python: 3.9.x not in '>=3.11,<4.0'`**
+
+macOS's built-in `python3` is **3.9**, and installing 3.11 adds a *separate* `python3.11`
+command without replacing `python3`. If `.venv` was built with 3.9 (by the manual steps, or an
+older `setup.sh`), rebuild it with 3.11 explicitly:
+
+```bash
+python3.11 --version          # confirm: Python 3.11.x
+rm -rf .venv
+python3.11 -m venv .venv
+./.venv/bin/python -m pip install -e .
+bash start.sh
+```
+
+If `python3.11` reports *"command not found"*, it isn't on your PATH yet — install it via
+`brew install python@3.11` or from [python.org](https://www.python.org/downloads/).
 
 ## Sharing the app (no installer)
 
