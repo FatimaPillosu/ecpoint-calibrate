@@ -46,8 +46,17 @@ def run(config: Config):
         if isinstance(_h, logging.FileHandler):
             try:
                 _h.acquire()
-                _h.stream.seek(0)
-                _h.stream.truncate(0)
+                try:
+                    _h.stream.seek(0)
+                    _h.stream.truncate(0)
+                except OSError:
+                    # truncate() on an append-mode stream is rejected on some
+                    # platforms (Linux raises EINVAL); clear the file by path,
+                    # and never let a best-effort log reset fail the run.
+                    try:
+                        os.truncate(_h.baseFilename, 0)
+                    except OSError:
+                        pass
             finally:
                 _h.release()
 
